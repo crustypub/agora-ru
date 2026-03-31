@@ -1,0 +1,18 @@
+  [2m2026-03-31T21:21:28.03979412+03:00[0m [33m WARN[0m [1;33mzino_core::application::secret_key[0m[33m: [33mauto-generated `secret` is used for deriving a secret key[0m
+    [2;3mat[0m /home/md/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zino-core-0.26.4/src/application/secret_key.rs:16
+
+  [2m2026-03-31T21:21:28.040871225+03:00[0m [33m WARN[0m [1;33mzino::application::axum_cluster[0m[33m: [33mlisten on `127.0.0.1:6080`, [1;33mserver_tag[0m[33m: "main", [1;33mapp_env[0m[33m: "dev", [1;33mapp_name[0m[33m: "agora-ru-backend", [1;33mapp_version[0m[33m: "0.1.0", [1;33mzino_version[0m[33m: "0.25.4"[0m
+    [2;3mat[0m /home/md/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zino-0.25.4/src/application/axum_cluster.rs:98
+
+  [2m2026-03-31T21:21:28.041486632+03:00[0m [32m INFO[0m [1;32mzino::application::axum_cluster[0m[32m: [32mRapiDoc router `/rapidoc` is registered for `127.0.0.1:6080`[0m
+    [2;3mat[0m /home/md/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zino-0.25.4/src/application/axum_cluster.rs:208
+
+  [2m2026-03-31T21:21:47.111480258+03:00[0m [33m WARN[0m [1;33mzino_core::application::secret_key[0m[33m: [33mauto-generated `secret` is used for deriving a secret key[0m
+    [2;3mat[0m /home/md/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zino-core-0.26.4/src/application/secret_key.rs:16
+
+  [2m2026-03-31T21:21:47.112723992+03:00[0m [33m WARN[0m [1;33mzino::application::axum_cluster[0m[33m: [33mlisten on `127.0.0.1:6080`, [1;33mserver_tag[0m[33m: "main", [1;33mapp_env[0m[33m: "dev", [1;33mapp_name[0m[33m: "agora-ru-backend", [1;33mapp_version[0m[33m: "0.1.0", [1;33mzino_version[0m[33m: "0.25.4"[0m
+    [2;3mat[0m /home/md/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zino-0.25.4/src/application/axum_cluster.rs:98
+
+  [2m2026-03-31T21:21:47.113348286+03:00[0m [32m INFO[0m [1;32mzino::application::axum_cluster[0m[32m: [32mRapiDoc router `/rapidoc` is registered for `127.0.0.1:6080`[0m
+    [2;3mat[0m /home/md/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zino-0.25.4/src/application/axum_cluster.rs:208
+
