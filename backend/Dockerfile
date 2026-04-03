@@ -1,23 +1,34 @@
-FROM rust:1.88-bookworm AS builder
+# --- Этап разработки (Development) ---
+FROM rust:1.88-bookworm AS dev
+
+# Устанавливаем инструменты для быстрой разработки
+RUN apt-get update && apt-get install -y clang mold && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-watch
 
 WORKDIR /app
 
-# Копируем файлы для кэширования зависимостей
+# Флаги для ускорения линковки (mold)
+ENV RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+
+# Копируем только файлы зависимостей для кэширования
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo 'fn main() { println!("stub"); }' > src/main.rs
-RUN cargo build --release || true
+RUN cargo build && rm -rf src # Предсборка зависимостей
 
-# Удаляем stub-артефакты, чтобы cargo пересобрал с реальным кодом
-RUN rm -rf src target/release/deps/agora_ru_backend* target/release/agora-ru-backend
-
-# Копируем исходный код и конфиги
+# Копируем весь остальной код
 COPY . .
 
-# Пересобираем с реальным кодом
+# По умолчанию в деве просто ждем команду из docker-compose
+CMD ["cargo", "watch", "-x", "run"]
+
+
+# --- Этап сборки (Builder для Production) ---
+FROM dev AS builder
 RUN cargo build --release
 
-# --- Финальный образ ---
-FROM debian:bookworm-slim
+
+# --- Финальный образ (Production) ---
+FROM debian:bookworm-slim AS release
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
@@ -26,9 +37,5 @@ WORKDIR /app
 COPY --from=builder /app/target/release/agora-ru-backend /app/agora-ru-backend
 COPY --from=builder /app/config /app/config
 
-ENV CARGO_PKG_NAME="agora-ru-backend"
-ENV CARGO_PKG_VERSION="0.1.0"
-
 EXPOSE 6080
-
 CMD ["./agora-ru-backend"]

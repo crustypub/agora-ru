@@ -17,8 +17,20 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: dev # <--- Указываем Docker остановиться на этапе 'dev'
     ports:
       - "6080:6080"
+    volumes:
+      - ./backend:/app
+      - cargo_cache:/usr/local/cargo/registry
+      - target_cache:/app/target
     environment:
       - RUST_LOG=info
+      - RUSTFLAGS=-C link-arg=-fuse-ld=mold
+    # Теперь 'cargo' будет найден, так как мы в образе 'dev'
+    command: cargo watch -x run 
     restart: unless-stopped
+
+volumes:
+  cargo_cache:
+  target_cache:
