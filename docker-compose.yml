@@ -1,7 +1,32 @@
 services:
+  # База данных PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: agora_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-agora_db}
+      POSTGRES_USER: ${DB_USER:-agora_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agora_user} -d ${DB_NAME:-agora_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agora_network
+
   frontend:
-    env_file: 
-      .env
+    env_file:
+      - .env
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -13,13 +38,18 @@ services:
       - /app/.nuxt
     environment:
       - NODE_ENV=development
+      - NUXT_PUBLIC_API_URL=http://localhost:6080
     restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - agora_network
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: dev # <--- Указываем Docker остановиться на этапе 'dev'
+      target: dev
     ports:
       - "6080:6080"
     volumes:
@@ -29,10 +59,23 @@ services:
     environment:
       - RUST_LOG=info
       - RUSTFLAGS=-C link-arg=-fuse-ld=mold
-    # Теперь 'cargo' будет найден, так как мы в образе 'dev'
-    command: cargo watch -x run 
+      - DATABASE_URL=postgresql://${DB_USER:-agora_user}:${DB_PASSWORD:-secure_password}@postgres:5432/${DB_NAME:-agora_db}
+    command: cargo watch -x run
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - agora_network
 
 volumes:
   cargo_cache:
+    name: agora_cargo_cache
   target_cache:
+    name: agora_target_cache
+  postgres_data:
+    name: agora_postgres_data
+
+networks:
+  agora_network:
+    driver: bridge

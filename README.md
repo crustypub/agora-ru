@@ -1,6 +1,6 @@
 # Agora RU
 
-Монорепозиторий с фронтендом (Nuxt.js) и бэкендом (Rust / Zino).
+Монорепозиторий с фронтендом (Nuxt.js) и бэкендом (Rust / actix-web).
 
 ## Структура проекта
 
@@ -58,3 +58,9 @@ cargo run
 - **Фронтенд:** [Nuxt.js 3](https://nuxt.com/) (Vue 3, TypeScript)
 - **Бэкенд:** [Zino](https://github.com/zino-rs/zino) (Rust, Axum)
 - **Оркестрация:** Docker Compose
+
+## Подключение к бд 
+
+```
+docker compose exec postgres psql -U USER_NAME -d DB_NAME
+```
