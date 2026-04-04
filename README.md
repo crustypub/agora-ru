@@ -33,7 +33,7 @@ docker compose up --build
 
 | Сервис    | URL                    |
 | --------- | ---------------------- |
-| Фронтенд  | http://localhost:3000  |
+| Фронтенд  | http://localhost:80  |
 | Бэкенд    | http://localhost:6080  |
 
 ### Локально

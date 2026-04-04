@@ -50,7 +50,7 @@ export default defineNuxtConfig({
 
     devServer: {
         host: '0.0.0.0',
-        port: 3000,
+        port: 80,
     },
 
     app: {
@@ -87,5 +87,9 @@ export default defineNuxtConfig({
         },
     },
 
-    modules: ['@nuxt/fonts'],
+    modules: ['@nuxt/fonts', 'nuxt-telegram-auth'],
+    runtimeConfig: {
+        // Этот токен доступен только на сервере
+        TELEGRAM_TOKEN: process.env.NUXT_TELEGRAM_TOKEN
+    }
 })
