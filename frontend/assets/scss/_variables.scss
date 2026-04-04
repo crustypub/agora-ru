@@ -1,0 +1,62 @@
+// ========== ЦВЕТОВАЯ ГАММА ==========
+// Основные цвета (греческий флаг)
+$blue-primary: #0D5EAF;
+$blue-dark: #084178;
+$blue-light: #3A7FC6;
+$white: #FFFFFF;
+$white-off: #F8F9FA;
+
+// Акцентные цвета
+$aqua: #2BA6CB;
+$teal: #1A8BBA;
+$sand: #EDE0C8;
+$olive: #8A9A5B;
+$terracotta: #D96C4A;
+
+// Серые оттенки
+$gray-100: #F8F9FA;
+$gray-200: #E9ECEF;
+$gray-300: #DEE2E6;
+$gray-400: #CED4DA;
+$gray-500: #ADB5BD;
+$gray-600: #6C757D;
+$gray-700: #495057;
+$gray-800: #343A40;
+$gray-900: #212529;
+
+// Системные цвета
+$success: #28A745;
+$warning: #FFC107;
+$danger: #DC3545;
+$info: #17A2B8;
+
+// ========== СЕМАНТИЧЕСКИЕ ПЕРЕМЕННЫЕ ==========
+$primary: $blue-primary;
+$secondary: $blue-light;
+$accent: $aqua;
+
+$text-primary: $gray-900;
+$text-secondary: $gray-700;
+$text-muted: $gray-600;
+
+$bg-primary: $white;
+$bg-secondary: $white-off;
+$bg-dark: $blue-dark;
+
+$border-color: $gray-300;
+
+// ============ РАЗМЕР ШРИФТА =========
+
+$base-font-size: 16px; // базовый размер для rem 
+$base-line-height: 1.5;
+
+$text-xs: 0.75rem;    // 12px
+$text-sm: 0.875rem;   // 14px
+$text-base: 1rem;     // 16px
+$text-md: 1.125rem;   // 18px
+$text-lg: 1.25rem;    // 20px
+$text-xl: 1.5rem;     // 24px
+$text-2xl: 1.875rem;  // 30px
+$text-3xl: 2.25rem;   // 36px
+$text-4xl: 3rem;      // 48px
+$text-5xl: 3.75rem;   // 60px

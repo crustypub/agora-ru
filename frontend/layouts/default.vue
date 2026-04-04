@@ -20,11 +20,12 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  font-size: $base-font-size;
 
   .layout-header {
     width: 100%;
     height: 70px;
-    background-color: #0D5EAF;
+    background-color: $blue-primary;
   }
 
   .layout-main {
@@ -37,7 +38,7 @@
   .layout-footer {
     width: 100%;
     min-height: 150px;
-    background-color: red;
+    background-color: $sand;
   }
 }
 </style>

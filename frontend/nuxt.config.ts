@@ -4,6 +4,18 @@ export default defineNuxtConfig({
     devtools: { enabled: true },
 
     css: ['~/assets/css/reset.css'],
+    
+    vite: {
+        css: {
+            preprocessorOptions: {
+                scss: {
+                    additionalData: `
+                        @use "~/assets/scss/_variables.scss" as *;
+                    `,
+                },
+            },
+        },
+    },
 
     devServer: {
         host: '0.0.0.0',
