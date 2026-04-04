@@ -1,14 +1,14 @@
 <template>
   <div class="default-layout">
-    <header>
-      <h1>Мой сайт</h1>
+    <header class="layout-header">
+
     </header>
-    
-    <main>
-      <slot /> 
+
+    <main class="layout-main">
+      <slot />
     </main>
-    
-    <footer>
+
+    <footer class="layout-footer">
       <p>© 2024 Мой сайт</p>
     </footer>
   </div>
@@ -16,9 +16,28 @@
 
 <style scoped lang="scss">
 .default-layout {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .layout-header {
     width: 100%;
-    height: 100%;
+    height: 70px;
+    background-color: #0D5EAF;
+  }
+
+  .layout-main {
+    width: 100%;
+    flex: 1;
     display: flex;
     flex-direction: column;
+  }
+
+  .layout-footer {
+    width: 100%;
+    min-height: 150px;
+    background-color: red;
+  }
 }
 </style>

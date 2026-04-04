@@ -17,7 +17,6 @@ useHead({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
   font-family: 'Inter', sans-serif;
 }
 
