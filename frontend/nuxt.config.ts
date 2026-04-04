@@ -90,6 +90,6 @@ export default defineNuxtConfig({
     modules: ['@nuxt/fonts', 'nuxt-telegram-auth'],
     runtimeConfig: {
         // Этот токен доступен только на сервере
-        TELEGRAM_TOKEN: process.env.NUXT_TELEGRAM_TOKEN
+        TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN
     }
 })
