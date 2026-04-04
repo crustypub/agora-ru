@@ -1,7 +1,12 @@
+<script setup lang="ts">
+
+
+</script>
+
 <template>
   <div class="default-layout">
     <header class="layout-header">
-      Agora Ru
+      <Header/>
     </header>
 
     <main class="layout-main">
@@ -27,7 +32,6 @@
     width: 100%;
     height: 70px;
     background-color: $blue-primary;
-    font-family: $header-main-font;
   }
 
   .layout-main {
