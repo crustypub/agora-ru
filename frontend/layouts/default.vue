@@ -1,7 +1,7 @@
 <template>
   <div class="default-layout">
     <header class="layout-header">
-
+      Agora Ru
     </header>
 
     <main class="layout-main">
@@ -21,11 +21,13 @@
   display: flex;
   flex-direction: column;
   font-size: $base-font-size;
+  font-family: $main-font;
 
   .layout-header {
     width: 100%;
     height: 70px;
     background-color: $blue-primary;
+    font-family: $header-main-font;
   }
 
   .layout-main {
