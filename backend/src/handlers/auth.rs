@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use actix_web::cookie::{SameSite, time, Cookie};
 use actix_web::{post, web, HttpResponse, Responder};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
@@ -80,5 +81,15 @@ pub async fn telegram_auth(
         }
     };
 
-    HttpResponse::Ok().json(AuthResponse { token })
+    let cookie = Cookie::build("auth_token", token)
+        .http_only(true) // Ключевой флаг!
+        .secure(true) // Всегда true в production (HTTPS)
+        .path("/")
+        .max_age(time::Duration::days(7))
+        .same_site(SameSite::Lax)
+        .finish();
+
+    HttpResponse::Ok()
+        .cookie(cookie)
+        .json(serde_json::json!({ "status": "success" }))
 }
