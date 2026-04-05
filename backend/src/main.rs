@@ -1,6 +1,15 @@
 use actix_web::{App, FromRequest, HttpRequest, HttpResponse, HttpServer, Responder, get, post, web};
 use serde::Deserialize;
 
+mod handlers;
+mod db;
+mod models;
+mod helpers;
+
+use handlers::auth::telegram_auth;
+use db::setup::setup_db;
+use models::{app::AppState};
+
 #[derive(Deserialize)]
 struct MyData {
     name: String,
@@ -8,10 +17,21 @@ struct MyData {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    dotenvy::dotenv().ok();
+    let pool = setup_db().await;
+    let bot_token = std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN not set");
+
+    let app_state: web::Data<AppState> = web::Data::new(AppState {
+        pool,
+        bot_token,
+    });
+
+    HttpServer::new(move || {
         App::new()
+            .app_data(app_state.clone())
             .service(hello)
             .service(echo)
+            .service(telegram_auth)
             .route("/hey", web::get().to(manual_hello))
     })
     .bind(("0.0.0.0", 6080))?

@@ -46,6 +46,8 @@ services:
       - agora_network
 
   backend:
+    env_file:
+      - .env
     build:
       context: ./backend
       dockerfile: Dockerfile
