@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use actix_web::{
-    get, post, web, App, FromRequest, HttpRequest, HttpResponse, HttpServer, Responder,
-};
+use actix_web::{post, web, HttpResponse, Responder};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::PgPool;
+use uuid::Uuid;
 
+use crate::db::users::upsert_tg_user;
 use crate::helpers::telegram::verify_tg_hash;
 use crate::models::app::AppState;
 
@@ -24,23 +24,61 @@ pub struct TelegramAuthParams {
     pub extra: HashMap<String, Value>,
 }
 
+#[derive(Serialize)]
+pub struct AuthResponse {
+    pub token: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: Uuid,
+    pub exp: usize,
+}
+
 #[post("/auth/telegram")]
 pub async fn telegram_auth(
     params: web::Json<TelegramAuthParams>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    // 1. Проверяем подпись (бизнес-логика в слое Service)
-
+    // 1. Проверяем подпись
     if !verify_tg_hash(&params, &state.bot_token) {
-        return format!("not valid");
+        return HttpResponse::Unauthorized().finish();
     }
-    return format!("valid");
 
-    // // 2. Ищем или создаем пользователя
-    // let user = user_repository::upsert_tg_user(&pool, &params).await;
+    // 2. Ищем или создаем пользователя
+    let user = match upsert_tg_user(&state.pool, &params).await {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("Failed to upsert user: {}", e);
+            return HttpResponse::InternalServerError().finish();
+        }
+    };
 
-    // // 3. Выпускаем JWT
-    // let token = jwt_service::create_token(user.id);
+    // 3. Выпускаем JWT
+    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
-    // HttpResponse::Ok().json(AuthResponse { token })
+    let expiration = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs()
+        + 60 * 60 * 24 * 7; // 7 days
+
+    let claims = Claims {
+        sub: user.id,
+        exp: expiration as usize,
+    };
+
+    let token = match encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Failed to create token: {}", e);
+            return HttpResponse::InternalServerError().finish();
+        }
+    };
+
+    HttpResponse::Ok().json(AuthResponse { token })
 }

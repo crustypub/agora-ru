@@ -1,12 +1,9 @@
 -- Создание расширений (если нужны)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Создание таблиц для Telegram Auth (если модуль требует)
--- Обычно nuxt-telegram-auth сам создаёт таблицы, но можно добавить свои
-
 -- Пример: таблица пользователей форума
 CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     telegram_id BIGINT UNIQUE NOT NULL,
     username VARCHAR(255),
     first_name VARCHAR(255),
