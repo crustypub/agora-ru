@@ -55,7 +55,7 @@ pub async fn telegram_auth(
     };
 
     // 3. Выпускаем JWT
-    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let secret = &state.jwt_secret;
 
     let expiration = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

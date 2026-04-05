@@ -20,10 +20,12 @@ async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
     let pool = setup_db().await;
     let bot_token = std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN not set");
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not set");
 
     let app_state: web::Data<AppState> = web::Data::new(AppState {
         pool,
         bot_token,
+        jwt_secret,
     });
 
     HttpServer::new(move || {
