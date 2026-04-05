@@ -82,8 +82,8 @@ pub async fn telegram_auth(
     };
 
     let cookie = Cookie::build("auth_token", token)
-        .http_only(true) // Ключевой флаг!
-        .secure(true) // Всегда true в production (HTTPS)
+        .http_only(true) 
+        .secure(true) 
         .path("/")
         .max_age(time::Duration::days(7))
         .same_site(SameSite::Lax)
