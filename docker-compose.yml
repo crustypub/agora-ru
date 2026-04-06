@@ -38,7 +38,7 @@ services:
       - /app/.nuxt
     environment:
       - NODE_ENV=development
-      - NUXT_PUBLIC_API_URL=http://localhost:6080
+      - NUXT_PUBLIC_API_URL=http://127.0.0.1:6080
     restart: unless-stopped
     depends_on:
       - backend

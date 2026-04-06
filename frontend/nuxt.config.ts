@@ -4,6 +4,15 @@ export default defineNuxtConfig({
     devtools: { enabled: true },
     css: ['~/assets/css/reset.css'],
 
+    // nitro: {
+    //     devProxy: {
+    //         '/api': {
+    //             target: process.env.NUXT_PUBLIC_API_BASE,
+    //             changeOrigin: true,
+    //         },
+    //     },
+    // },
+
     vite: {
         css: {
             preprocessorOptions: {
@@ -17,6 +26,14 @@ export default defineNuxtConfig({
     },
 
     fonts: {
+        provider: 'local',
+        providers: {
+            google: false,
+            bunny: false,
+            fontshare: false,
+            adobe: false,
+            fontsource: false
+        },
         families: [
             {
                 name: 'Caesar Dressing',
@@ -90,6 +107,10 @@ export default defineNuxtConfig({
     modules: ['@nuxt/fonts', 'nuxt-telegram-auth'],
     runtimeConfig: {
         // Этот токен доступен только на сервере
-        TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN
+        TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN,
+
+        public: {
+            apiBase: process.env.NUXT_PUBLIC_API_BASE
+        },
     }
 })
