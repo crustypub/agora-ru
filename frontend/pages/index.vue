@@ -17,7 +17,6 @@ useHead({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-family: 'Inter', sans-serif;
 }
 
 h1 {

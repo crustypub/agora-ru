@@ -2,16 +2,27 @@
 export default defineNuxtConfig({
     compatibilityDate: '2025-01-01',
     devtools: { enabled: true },
-    css: ['~/assets/css/reset.css'],
+    css: ['~/assets/css/reset.css', '~/assets/css/font.css'],
 
+    // Кэширование шрифта
     // nitro: {
-    //     devProxy: {
-    //         '/api': {
-    //             target: process.env.NUXT_PUBLIC_API_BASE,
-    //             changeOrigin: true,
-    //         },
+    //     devServer: {
+    //         watch: ['./server']
     //     },
+    //     routeRules: {
+    //         '/fonts/**': {
+    //             headers: {
+    //                 'Cache-Control': 'public, max-age=31536000, immutable'
+    //             }
+    //         }
+    //     }
     // },
+
+    experimental: {
+        // Улучшает обработку динамических импортов
+        payloadExtraction: true
+    },
+
 
     vite: {
         css: {
@@ -24,47 +35,6 @@ export default defineNuxtConfig({
             },
         },
     },
-
-    fonts: {
-        provider: 'local',
-        providers: {
-            google: false,
-            bunny: false,
-            fontshare: false,
-            adobe: false,
-            fontsource: false
-        },
-        families: [
-            {
-                name: 'Caesar Dressing',
-                provider: 'local',
-                src: '/fonts/CaesarDressing-Regular.ttf',
-                display: 'swap',
-                weight: 400,
-                style: 'normal',
-                fallbacks: ['Arial']
-            },
-            {
-                name: 'IBM Plex Sans',
-                provider: 'local',
-                src: '/fonts/IBMPlexSans-Regular.ttf',
-                display: 'swap',
-                weight: 400,
-                style: 'normal',
-                fallbacks: ['Arial']
-            },
-            {
-                name: 'IBM Plex Sans',
-                provider: 'local',
-                src: '/fonts/IBMPlexSans-SemiBold.ttf',
-                display: 'swap',
-                weight: 600,
-                style: 'normal',
-                fallbacks: ['Arial']
-            }
-        ],
-    },
-
     devServer: {
         host: '0.0.0.0',
         port: 80,
@@ -78,33 +48,10 @@ export default defineNuxtConfig({
                 { name: 'viewport', content: 'width=device-width, initial-scale=1' },
                 { name: 'description', content: 'Agora RU — Платформа' },
             ],
-            link: [
-                {
-                    rel: 'preload',
-                    as: 'font',
-                    type: 'font/ttf',
-                    href: '/fonts/CaesarDressing-Regular.ttf',
-                    crossorigin: 'anonymous',
-                },
-                {
-                    rel: 'preload',
-                    as: 'font',
-                    type: 'font/ttf',
-                    href: '/fonts/IBMPlexSans-Regular.ttf',
-                    crossorigin: 'anonymous',
-                },
-                {
-                    rel: 'preload',
-                    as: 'font',
-                    type: 'font/ttf',
-                    href: '/fonts/IBMPlexSans-SemiBold.ttf',
-                    crossorigin: 'anonymous',
-                },
-            ],
         },
     },
 
-    modules: ['@nuxt/fonts', 'nuxt-telegram-auth'],
+    modules: ['nuxt-telegram-auth'],
     runtimeConfig: {
         // Этот токен доступен только на сервере
         TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN,

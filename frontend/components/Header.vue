@@ -35,7 +35,7 @@
 
 .main-link__content {
     font-size: $text-2xl;
-    font-family: $header-main-font;
+    font-family: 'Caesar Dressing', sans-serif;
 }
 
 </style>

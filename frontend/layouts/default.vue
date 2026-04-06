@@ -26,7 +26,7 @@
   display: flex;
   flex-direction: column;
   font-size: $base-font-size;
-  font-family: $main-font;
+  font-family: 'IBM Plex Sans', sans-serif;
 
   .layout-header {
     width: 100%;

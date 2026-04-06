@@ -18,7 +18,7 @@ const testCallback = async (user: object) => {
       method: 'POST',
       body: user,
     })
-    await navigateTo('/');
+    await navigateTo('/', { replace: true });
   } catch(e) {
     console.error(e);
   }
