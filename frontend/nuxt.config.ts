@@ -51,7 +51,7 @@ export default defineNuxtConfig({
         },
     },
 
-    modules: ['nuxt-telegram-auth'],
+    modules: ['nuxt-telegram-auth', '@nuxt/ui'],
     runtimeConfig: {
         // Этот токен доступен только на сервере
         TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN,
