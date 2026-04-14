@@ -1,21 +1,19 @@
 <script setup lang="ts">
+import Footer from '~/components/Footer.vue';
+
 
 
 </script>
 
 <template>
   <div class="default-layout">
-    <header class="layout-header">
-      <Header/>
-    </header>
+    <Header />
 
     <main class="layout-main">
       <slot />
     </main>
 
-    <footer class="layout-footer">
-      <p>© 2024 Мой сайт</p>
-    </footer>
+    <Footer />
   </div>
 </template>
 
@@ -27,13 +25,7 @@
   flex-direction: column;
   font-size: $base-font-size;
   font-family: 'IBM Plex Sans', sans-serif;
-
-  .layout-header {
-    width: 100%;
-    height: 70px;
-    background-color: $blue-primary;
-  }
-
+  
   .layout-main {
     width: 100%;
     flex: 1;
@@ -41,10 +33,6 @@
     flex-direction: column;
   }
 
-  .layout-footer {
-    width: 100%;
-    min-height: 150px;
-    background-color: $sand;
-  }
+
 }
 </style>

@@ -2,21 +2,20 @@
 export default defineNuxtConfig({
     compatibilityDate: '2025-01-01',
     devtools: { enabled: true },
-    css: ['~/assets/css/reset.css', '~/assets/css/font.css'],
-
+    css: ['~/assets/css/main.css', '~/assets/css/reset.css', '~/assets/css/font.css'],
     // Кэширование шрифта
-    // nitro: {
-    //     devServer: {
-    //         watch: ['./server']
-    //     },
-    //     routeRules: {
-    //         '/fonts/**': {
-    //             headers: {
-    //                 'Cache-Control': 'public, max-age=31536000, immutable'
-    //             }
-    //         }
-    //     }
-    // },
+    nitro: {
+        devServer: {
+            watch: ['./server']
+        },
+        routeRules: {
+            '/fonts/**': {
+                headers: {
+                    'Cache-Control': 'public, max-age=31536000, immutable'
+                }
+            }
+        }
+    },
 
     experimental: {
         // Улучшает обработку динамических импортов
@@ -51,7 +50,13 @@ export default defineNuxtConfig({
         },
     },
 
-    modules: ['nuxt-telegram-auth', '@nuxt/ui'],
+    modules: ['nuxt-telegram-auth', '@nuxt/ui', '@nuxtjs/color-mode'],
+
+    ui: {
+        theme: {
+            colors: ['primary', 'secondary', 'success', 'error', 'warning'],
+        },
+    },
     runtimeConfig: {
         // Этот токен доступен только на сервере
         TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN,

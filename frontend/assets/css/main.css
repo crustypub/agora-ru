@@ -1,0 +1,73 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  /* PRIMARY - #0D5EAF */
+  --color-primary-50: #e6f0f9;
+  --color-primary-100: #cce1f3;
+  --color-primary-200: #99c3e7;
+  --color-primary-300: #66a4db;
+  --color-primary-400: #3386cf;
+  --color-primary-500: #0D5EAF;
+  /* основной цвет */
+  --color-primary-600: #0a4b8c;
+  --color-primary-700: #083869;
+  --color-primary-800: #052646;
+  --color-primary-900: #031323;
+  --color-primary-950: #010a14;
+  --color-primary: #0D5EAF;
+
+  /* SECONDARY - #8A9A5B */
+  --color-secondary-50: #f5f7f0;
+  --color-secondary-100: #ebece0;
+  --color-secondary-200: #d7dac2;
+  --color-secondary-300: #c2c7a3;
+  --color-secondary-400: #aeb57f;
+  --color-secondary-500: #8A9A5B;
+  --color-secondary: #8A9A5B;
+  /* основной цвет */
+  --color-secondary-600: #6f7b49;
+  --color-secondary-700: #545c37;
+  --color-secondary-800: #393e25;
+  --color-secondary-900: #1e1f12;
+  --color-secondary-950: #0f1009;
+
+  /* SUCCESS (без изменений) */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-300: #86efac;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+  --color-success-900: #14532d;
+  --color-success-950: #052e16;
+
+  /* ERROR (без изменений) */
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-200: #fecaca;
+  --color-error-300: #fca5a5;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+  --color-error-800: #991b1b;
+  --color-error-900: #7f1d1d;
+  --color-error-950: #450a0a;
+
+  /* WARNING (без изменений) */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+  --color-warning-950: #451a03;
+}

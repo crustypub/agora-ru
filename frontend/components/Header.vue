@@ -1,24 +1,17 @@
 <template>
-    <div class="container">
-        <NuxtLink to="/" active-class="" exact-active-class="" class="main-link">
-            <span class="main-link__content">
-                Agora Ru
-            </span>
-        </NuxtLink>
-    </div>
+    <UHeader class="container bg-primary" >
+        <template #left>
+            <NuxtLink to="/" active-class="" exact-active-class="" class="main-link">
+                <span class="main-link__content">
+                    Agora Ru
+                </span>
+            </NuxtLink>
+        </template>
+    </UHeader>
 </template>
 <script setup lang="ts"></script>
 
 <style lang="scss" scoped>
-.container {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    padding: 0.25rem 1rem;
-}
-
-
 
 .main-link,
 .main-link:visited,
@@ -37,5 +30,4 @@
     font-size: $text-2xl;
     font-family: 'Caesar Dressing', sans-serif;
 }
-
 </style>
