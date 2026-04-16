@@ -1,5 +1,5 @@
 <template>
-    <UHeader class="container bg-primary" >
+    <UHeader class="bg-primary w-full p-12px" >
         <template #left>
             <NuxtLink to="/" active-class="" exact-active-class="" class="main-link">
                 <span class="main-link__content">
