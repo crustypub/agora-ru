@@ -1,37 +1,38 @@
 <template>
-    <UHeader mode="slideover">
+    <UHeader mode="slideover"
+        :toggle="{ color: 'primary', variant: 'solid', class: 'text-white hover:bg-primary-600/50 data-[state=open]:bg-primary-600/50' }">
         <template #left>
             <NuxtLink to="/" class="main-link">
                 <span class="main-link__content">Agora Ru</span>
             </NuxtLink>
         </template>
 
-        <UNavigationMenu
-            :items="navItems"
-            variant="link"
-            :ui="{
-                root: 'gap-0',
-                link: [
-                    // Цвет текста
-                    'text-white/60 hover:text-white data-[active=true]:text-white',
-                    // Типографика
-                    'font-medium text-sm tracking-wide',
-                    // Переходы
-                    'transition-colors duration-200',
-                    // Анимированное подчёркивание активного пункта
-                    'relative',
-                    'after:absolute after:bottom-0 after:inset-x-2.5',
-                    'after:h-px after:rounded-full after:bg-white/80',
-                    'after:scale-x-0 data-[active=true]:after:scale-x-100',
-                    'after:transition-transform after:duration-300 after:ease-out after:origin-center',
-                ].join(' '),
-                linkLeadingIcon: [
-                    'size-4 text-white/50',
-                    'group-hover:text-white/90 data-[active=true]:text-white',
-                    'transition-colors duration-200',
-                ].join(' '),
-            }"
-        />
+        <UNavigationMenu :items="navItems" variant="link" :ui="{
+            root: 'gap-0',
+            link: [
+                // Цвет текста
+                'text-white/60 hover:text-white data-[active=true]:text-white',
+                // Типографика
+                'font-medium text-sm tracking-wide',
+                // Переходы
+                'transition-colors duration-200',
+                // Анимированное подчёркивание активного пункта
+                'relative',
+                'after:absolute after:bottom-0 after:inset-x-2.5',
+                'after:h-px after:rounded-full after:bg-white/80',
+                'after:scale-x-0 data-[active=true]:after:scale-x-100',
+                'after:transition-transform after:duration-300 after:ease-out after:origin-center',
+            ].join(' '),
+            linkLeadingIcon: [
+                'size-4 text-white/50',
+                'group-hover:text-white/90 data-[active=true]:text-white',
+                'transition-colors duration-200',
+            ].join(' '),
+        }" />
+
+        <template #body>
+            <UNavigationMenu :items="navItems" orientation="vertical" class="-mx-2.5" />
+        </template>
     </UHeader>
 </template>
 
