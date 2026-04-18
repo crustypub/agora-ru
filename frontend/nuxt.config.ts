@@ -2,19 +2,39 @@
 export default defineNuxtConfig({
     compatibilityDate: '2025-01-01',
     devtools: { enabled: true },
-    css: ['~/assets/css/main.css', '~/assets/css/reset.css', '~/assets/css/font.css'],
+    css: ['~/assets/css/main.css'],
     // Кэширование шрифта
     nitro: {
         devServer: {
             watch: ['./server']
         },
-        routeRules: {
-            '/fonts/**': {
-                headers: {
-                    'Cache-Control': 'public, max-age=31536000, immutable'
-                }
-            }
-        }
+    },
+
+    fonts: {
+        // Используем src напрямую — модуль сгенерирует @font-face и preload в SSR HTML
+        families: [
+            {
+                name: 'Caesar Dressing',
+                src: '/fonts/CaesarDressing-Regular.ttf',
+                weight: '400',
+                display: 'swap',
+                global: true,
+            },
+            {
+                name: 'IBM Plex Sans',
+                src: '/fonts/IBMPlexSans-Regular.ttf',
+                weight: '400',
+                display: 'swap',
+                global: true,
+            },
+            {
+                name: 'IBM Plex Sans',
+                src: '/fonts/IBMPlexSans-SemiBold.ttf',
+                weight: '600',
+                display: 'swap',
+                global: true,
+            },
+        ],
     },
 
     experimental: {
@@ -50,7 +70,7 @@ export default defineNuxtConfig({
         },
     },
 
-    modules: ['nuxt-telegram-auth', '@nuxt/ui', '@nuxtjs/color-mode'],
+    modules: ['nuxt-telegram-auth', '@nuxt/fonts', '@nuxt/ui', '@nuxtjs/color-mode'],
 
     ui: {
         theme: {

@@ -1,24 +1,5 @@
-
-@font-face {
-  font-family: 'Caesar Dressing';
-  src: url('/fonts/CaesarDressing-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: optional; 
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  src: url('/fonts/IBMPlexSans-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: optional; 
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  src: url('/fonts/IBMPlexSans-SemiBold.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap; 
-}
+/*
+ * Шрифты теперь управляются через @nuxt/fonts в nuxt.config.ts.
+ * Модуль автоматически генерирует @font-face и <link rel="preload">
+ * в SSR HTML — этот файл больше не нужен.
+ */
