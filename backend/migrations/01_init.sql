@@ -14,4 +14,4 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Индексы для производительности
-CREATE INDEX idx_telegram_id ON users(telegram_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_id ON users(telegram_id);

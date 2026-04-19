@@ -1,8 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{
-    get, http, post, web, App, FromRequest, HttpRequest, HttpResponse, HttpServer, Responder,
-};
-use serde::Deserialize;
+use actix_web::{http, web, App, HttpServer};
 
 mod db;
 mod handlers;
@@ -10,13 +7,11 @@ mod helpers;
 mod models;
 
 use db::setup::setup_db;
-use handlers::auth::telegram_auth;
+use handlers::{
+    auth::telegram_auth,
+    post::{create_post, get_posts},
+};
 use models::app::AppState;
-
-#[derive(Deserialize)]
-struct MyData {
-    name: String,
-}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -25,6 +20,11 @@ async fn main() -> std::io::Result<()> {
     let bot_token = std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN not set");
 
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not set");
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
 
     let app_state: web::Data<AppState> = web::Data::new(AppState {
         pool,
@@ -47,27 +47,12 @@ async fn main() -> std::io::Result<()> {
 
         App::new().wrap(cors).app_data(app_state.clone()).service(
             web::scope("/api")
-                .service(hello)
-                .service(echo)
                 .service(telegram_auth)
-                .route("/hey", web::get().to(manual_hello)),
+                .service(get_posts)
+                .service(create_post)
         )
     })
     .bind(("0.0.0.0", 6080))?
     .run()
     .await
-}
-
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
-}
-
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
-async fn manual_hello(item: web::Json<MyData>) -> impl Responder {
-    format!("wot, it's working! {:?}", item.name)
 }

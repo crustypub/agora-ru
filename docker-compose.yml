@@ -15,7 +15,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agora_user} -d ${DB_NAME:-agora_db}"]
       interval: 10s
@@ -62,7 +61,7 @@ services:
       - RUST_LOG=info
       - RUSTFLAGS=-C link-arg=-fuse-ld=mold
       - DATABASE_URL=postgresql://${DB_USER:-agora_user}:${DB_PASSWORD:-secure_password}@postgres:5432/${DB_NAME:-agora_db}
-    command: cargo watch -x run
+    command: sh -c "find /app/src -name '*.rs' | xargs touch && cargo watch -x run"
     restart: unless-stopped
     depends_on:
       postgres:
