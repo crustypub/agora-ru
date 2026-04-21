@@ -20,7 +20,7 @@ import Footer from '~/components/Footer.vue';
 <style scoped lang="scss">
 .default-layout {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   font-size: $base-font-size;
@@ -28,9 +28,7 @@ import Footer from '~/components/Footer.vue';
   
   .layout-main {
     width: 100%;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+    height: 100%;
   }
 
 
