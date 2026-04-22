@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <MainPage/>
+    <MainPage />
   </div>
 </template>
 
@@ -20,7 +20,6 @@ useHead({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  
 }
 
 h1 {

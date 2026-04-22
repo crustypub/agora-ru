@@ -1,17 +1,18 @@
 <template>
-    <div v-for="post in posts">
-        {{ post.id }}
+    <div class="posts-container">
+        <div v-for="post in posts">
+            <Post :data="post" />
+        </div>
     </div>
 </template>
 <script setup lang="ts">
 import { useApi } from '~/composables/useApi';
 import type { IPostResponse } from '~/models/api/post.api';
 import type { IPostResponseItem } from '~/models/entities/post.entities';
+import Post from './Post.vue';
 
 const posts = ref<IPostResponseItem[]>([]);
 
-// key уникален для этого компонента, чтобы Nuxt не переиспользовал
-// кешированный результат от другого вызова useFetch с тем же URL
 const { data: response } = await useApi<IPostResponse>('/api/post');
 
 const setPosts = () => {
@@ -20,20 +21,19 @@ const setPosts = () => {
     }
 };
 
-// Вызываем сразу — на случай если данные уже пришли по SSR
 setPosts();
 
-// Следим за изменениями — для клиентской загрузки
 watch(response, () => {
-    console.log('response', response)
     setPosts();
 });
-
-onMounted(() => {
-    console.log('response2', response.value)
-})
 </script>
 
 <style lang="scss" scoped>
-
+.posts-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 </style>
