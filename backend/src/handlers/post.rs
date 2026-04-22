@@ -1,4 +1,4 @@
-use crate::handlers::auth::Claims;
+use crate::{handlers::auth::Claims, models::post::CreatePost};
 use crate::models::app::AppState;
 use crate::models::post::PostParams;
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
@@ -17,11 +17,19 @@ pub async fn get_posts(
     let posts_result = sqlx::query_as::<_, Post>(
         r#"
         SELECT 
-            id, author, title, content,
-            rating_plus, rating_minus, comments_count,
-            created_at, updated_at
-        FROM posts
-        ORDER BY created_at DESC
+            p.id, p.title, p.content,
+            p.rating_plus, p.rating_minus, p.comments_count,
+            p.created_at, p.updated_at,
+            json_build_object(
+                'id', u.id,
+                'username', u.username,
+                'first_name', u.first_name,
+                'last_name', u.last_name,
+                'avatar_url', u.avatar_url
+            ) as author
+        FROM posts p
+        JOIN users u ON p.author = u.id
+        ORDER BY p.created_at DESC
         LIMIT $1 OFFSET $2
         "#,
     )
@@ -99,7 +107,7 @@ pub async fn create_post(
     };
 
     // 3. Создаём пост, подставляя author из токена
-    let result = sqlx::query_as::<_, Post>(
+    let result = sqlx::query_as::<_, CreatePost>(
         r#"
         INSERT INTO posts (author, title, content)
         VALUES ($1, $2, $3)

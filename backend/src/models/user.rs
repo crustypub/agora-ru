@@ -8,7 +8,7 @@ pub struct User {
     pub username: Option<String>,
     pub first_name: String,
     pub last_name: Option<String>,
-    pub photo_url: Option<String>,
+    pub avatar_url: Option<String>,
     pub created_at: chrono::NaiveDateTime,
     pub last_login: Option<chrono::NaiveDateTime>,
 }
