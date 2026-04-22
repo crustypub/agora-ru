@@ -1,4 +1,3 @@
-// composables/useApi.ts
 export const useApi = <T>(url: string, options: any = {}) => {
   const config = useRuntimeConfig()
 

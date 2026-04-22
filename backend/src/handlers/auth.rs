@@ -14,7 +14,7 @@ use crate::models::app::AppState;
 #[derive(Deserialize, Serialize)]
 pub struct TelegramAuthParams {
     pub id: i64,
-    pub first_name: String,
+    pub first_name: Option<String>,
     pub last_name: Option<String>,
     pub username: Option<String>,
     pub photo_url: Option<String>,

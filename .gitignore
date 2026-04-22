@@ -3,6 +3,7 @@
 .vscode/
 *.swp
 *.swo
+.agents/
 
 # OS
 .DS_Store

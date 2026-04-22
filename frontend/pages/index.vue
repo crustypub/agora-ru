@@ -1,11 +1,12 @@
 <template>
   <div class="container">
-    <h1>Agora RU</h1>
-    <p>Фронтенд запущен и работает 🚀</p>
+    <MainPage/>
   </div>
 </template>
 
 <script setup lang="ts">
+import MainPage from '~/components/mainPage/MainPage.vue';
+
 useHead({
   title: 'Agora RU — Главная',
 })
