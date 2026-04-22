@@ -37,7 +37,8 @@ services:
       - /app/.nuxt
     environment:
       - NODE_ENV=development
-      - NUXT_PUBLIC_API_URL=http://127.0.0.1:6080
+      # Адрес backend внутри Docker-сети. Используется только серверным прокси Nuxt.
+      - BACKEND_URL=http://backend:6080
     restart: unless-stopped
     depends_on:
       - backend

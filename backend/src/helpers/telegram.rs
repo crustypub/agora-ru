@@ -26,7 +26,9 @@ pub fn verify_tg_hash(params: &web::Json<TelegramAuthParams>, bot_token: &String
     let mut data_parts: Vec<String> = Vec::new();
 
     data_parts.push(format!("auth_date={}", params.auth_date));
-    data_parts.push(format!("first_name={}", params.first_name));
+    if let Some(ref first_name) = params.first_name {
+        data_parts.push(format!("first_name={}", first_name));
+    }
     data_parts.push(format!("id={}", params.id));
 
     if let Some(ref last_name) = params.last_name {
@@ -57,8 +59,7 @@ pub fn verify_tg_hash(params: &web::Json<TelegramAuthParams>, bot_token: &String
     let secret_key = Sha256::digest(bot_token.as_bytes());
 
     // 4. HMAC-SHA-256(secret_key, data_check_string)
-    let mut mac =
-        HmacSha256::new_from_slice(&secret_key).expect("HMAC error");
+    let mut mac = HmacSha256::new_from_slice(&secret_key).expect("HMAC error");
     mac.update(data_check_string.as_bytes());
     let result = mac.finalize().into_bytes();
 
