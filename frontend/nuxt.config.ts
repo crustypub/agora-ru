@@ -11,28 +11,25 @@ export default defineNuxtConfig({
     },
 
     fonts: {
-        // Используем src напрямую — модуль сгенерирует @font-face и preload в SSR HTML
+        // Убрано global: true, чтобы предотвратить предзагрузку (preload) тяжелых .ttf файлов на каждой странице
         families: [
             {
                 name: 'Caesar Dressing',
                 src: '/fonts/CaesarDressing-Regular.ttf',
                 weight: '400',
                 display: 'swap',
-                global: true,
             },
             {
                 name: 'IBM Plex Sans',
                 src: '/fonts/IBMPlexSans-Regular.ttf',
                 weight: '400',
                 display: 'swap',
-                global: true,
             },
             {
                 name: 'IBM Plex Sans',
                 src: '/fonts/IBMPlexSans-SemiBold.ttf',
                 weight: '600',
                 display: 'swap',
-                global: true,
             },
         ],
     },
