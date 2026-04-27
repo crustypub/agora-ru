@@ -1,4 +1,3 @@
-use sqlx::types::chrono;
 use uuid::Uuid;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -9,6 +8,6 @@ pub struct User {
     pub first_name: Option<String>,
     pub last_name: Option<String>,
     pub avatar_url: Option<String>,
-    pub created_at: chrono::NaiveDateTime,
-    pub last_login: Option<chrono::NaiveDateTime>,
+    pub created_at: i64,
+    pub last_login: Option<i64>,
 }

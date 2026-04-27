@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{types::{chrono, Json}, FromRow};
+use sqlx::{types::Json, FromRow};
 use uuid::Uuid;
 use validator::Validate;
 
@@ -27,8 +27,8 @@ pub struct Post {
     pub rating_plus: i32,
     pub rating_minus: i32,
     pub comments_count: i32,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, FromRow, Serialize)]
@@ -40,10 +40,9 @@ pub struct CreatePost {
     pub rating_plus: i32,
     pub rating_minus: i32,
     pub comments_count: i32,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
-
 
 #[derive(Deserialize)]
 pub struct PostParams {
