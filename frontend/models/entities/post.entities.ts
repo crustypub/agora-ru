@@ -14,6 +14,6 @@ export interface IPostResponseItem {
     content: string,
     rating_minus: number,
     rating_plus: number
-    created_at: string,
-    updated_at: string,
+    created_at: number,
+    updated_at: number,
 }
