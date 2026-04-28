@@ -20,6 +20,9 @@ export default defineAppConfig({
                 center: 'mt-2 lg:mt-0 lg:order-2 flex items-center justify-center',
                 right: 'lg:flex-1 flex items-center justify-center lg:justify-end gap-x-1.5 lg:order-3',
             }
+        },
+        button: {
+            base: 'cursor-pointer'
         }
     }
 })

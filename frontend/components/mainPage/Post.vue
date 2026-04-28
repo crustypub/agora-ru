@@ -11,12 +11,16 @@
                     <NuxtLink to="/" class="post-footer__username" v-if="data?.author?.username">@{{
                         data.author.username }}
                     </NuxtLink>
-                    <div class="post-footer__separator"/>
+                    <div class="post-footer__separator" />
                     <span class="post-footer__created_at">{{ postFormatDateTime(data.created_at) }}</span>
                 </div>
                 <div class="post-footer__action-btns">
-                    <UButton icon="material-symbols:mode-comment-outline-rounded" size="xs" color="primary"
-                        variant="subtle">1</UButton>
+                    <UButton 
+                        icon="material-symbols:mode-comment-outline-rounded"
+                        size="xs"
+                        color="primary"
+                        variant="subtle"
+                    >{{ Number(data?.comments_count) || 0}}</UButton>
                 </div>
             </div>
         </div>
