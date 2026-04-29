@@ -34,11 +34,13 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - /app/.nuxt
     environment:
       - NODE_ENV=development
       # Адрес backend внутри Docker-сети. Используется только серверным прокси Nuxt.
       - BACKEND_URL=http://backend:6080
+      # Стабильный file-watcher в Docker (polling вместо inotify)
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
     restart: unless-stopped
     depends_on:
       - backend
