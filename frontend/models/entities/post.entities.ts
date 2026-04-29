@@ -13,7 +13,7 @@ export interface IPostResponseItem {
     title: string,
     content: string,
     rating_minus: number,
-    rating_plus: number
+    rating_plus: string[]
     created_at: number,
     updated_at: number,
 }

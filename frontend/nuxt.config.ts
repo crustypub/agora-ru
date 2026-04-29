@@ -1,7 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
     compatibilityDate: '2025-01-01',
-    devtools: { enabled: false },
+    devtools: { enabled: true },
     css: ['~/assets/css/main.css'],
     // Кэширование шрифта
     nitro: {
@@ -12,6 +12,9 @@ export default defineNuxtConfig({
 
     fonts: {
         // Убрано global: true, чтобы предотвратить предзагрузку (preload) тяжелых .ttf файлов на каждой странице
+        providers: {
+            fontsource: false,
+        },
         families: [
             {
                 name: 'Caesar Dressing',
