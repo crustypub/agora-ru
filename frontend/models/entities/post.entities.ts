@@ -13,7 +13,9 @@ export interface IPostResponseItem {
     title: string,
     content: string,
     rating_minus: number,
-    rating_plus: string[]
+    rating_plus: number,
     created_at: number,
     updated_at: number,
+    is_liked: boolean,
+    is_disliked: boolean,
 }

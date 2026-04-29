@@ -32,6 +32,21 @@ pub struct Post {
 }
 
 #[derive(Debug, FromRow, Serialize)]
+pub struct PostResponse {
+    pub id: Uuid,
+    pub author: Json<Author>,
+    pub title: String,
+    pub content: String,
+    pub rating_plus: usize,
+    pub rating_minus:usize,
+    pub comments_count: i32,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub is_liked: bool,
+    pub is_disliked: bool,
+}
+
+#[derive(Debug, FromRow, Serialize)]
 pub struct CreatePost {
     pub id: Uuid,
     pub author: Uuid,
@@ -43,6 +58,16 @@ pub struct CreatePost {
     pub created_at: i64,
     pub updated_at: i64,
 }
+#[derive(Debug, FromRow, Serialize)]
+pub struct CreatePostResponse {
+    pub id: Uuid,
+    pub author: Uuid,
+    pub title: String,
+    pub content: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
 
 #[derive(Deserialize)]
 pub struct PostParams {

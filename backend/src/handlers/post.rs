@@ -1,6 +1,6 @@
-use crate::{handlers::auth::Claims, models::post::CreatePost};
 use crate::models::app::AppState;
-use crate::models::post::PostParams;
+use crate::models::post::{CreatePostResponse, PostParams, PostResponse};
+use crate::{handlers::auth::Claims, models::post::CreatePost};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 
@@ -8,6 +8,7 @@ use crate::models::post::{CreatePostRequest, Post};
 
 #[get("/post")]
 pub async fn get_posts(
+    req: HttpRequest,
     params: web::Query<PostParams>,
     state: web::Data<AppState>,
 ) -> impl Responder {
@@ -45,19 +46,92 @@ pub async fn get_posts(
     match (posts_result, count_result) {
         (Ok(posts), Ok(total_count)) => {
             let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
+            let token: Option<String> = req
+                .headers()
+                .get("Authorization")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.strip_prefix("Bearer "))
+                .map(|t| t.to_string());
 
-            HttpResponse::Ok().json(serde_json::json!({
-                "status": "success",
-                "data": posts,
-                "meta": {
-                    "current_page": params.page,
-                    "per_page": limit,
-                    "total_count": total_count,
-                    "total_pages": total_pages,
-                    "has_next": params.page < total_pages,
-                    "has_previous": params.page > 1
-                }
-            }))
+            if let Some(t) = token {
+                // Логика для авторизованного юзера
+                let author_id = match decode::<Claims>(
+                    &t,
+                    &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+                    &Validation::default(),
+                ) {
+                    Ok(data) => data.claims.sub,
+                    Err(e) => {
+                        eprintln!("JWT decode error: {}", e);
+                        return HttpResponse::Unauthorized()
+                            .json(serde_json::json!({ "error": "Invalid or expired token" }));
+                    }
+                };
+
+                let rating_plus_result = posts.iter().any(|x: &Post| x.rating_plus.contains(&author_id));
+                let rating_minus_result = posts.iter().any(|x: &Post| x.rating_minus.contains(&author_id));
+
+                let response: Vec<PostResponse> = posts
+                    .into_iter()
+                    .map(|post| PostResponse {
+                        id: post.id,
+                        author: post.author,
+                        title: post.title,
+                        content: post.content,
+                        rating_plus: post.rating_plus.len(),
+                        rating_minus: post.rating_minus.len(),
+                        comments_count: post.comments_count,
+                        created_at: post.created_at,
+                        updated_at: post.updated_at,
+                        is_liked: rating_plus_result,
+                        is_disliked: rating_minus_result,
+                    })
+                    .collect();
+
+                HttpResponse::Ok().json(serde_json::json!({
+                    "status": "success",
+                    "data": response,
+                    "meta": {
+                        "current_page": params.page,
+                        "per_page": limit,
+                        "total_count": total_count,
+                        "total_pages": total_pages,
+                        "has_next": params.page < total_pages,
+                        "has_previous": params.page > 1
+                    }
+                }))
+            } else {
+    
+                let response: Vec<PostResponse> = posts
+                    .into_iter()
+                    .map(|post| PostResponse {
+                        id: post.id,
+                        author: post.author,
+                        title: post.title,
+                        content: post.content,
+                        rating_plus: post.rating_plus.len(),
+                        rating_minus: post.rating_minus.len(),
+                        comments_count: post.comments_count,
+                        created_at: post.created_at,
+                        updated_at: post.updated_at,
+                        is_disliked: false,
+                        is_liked: false,
+                    })
+                    .collect();
+
+                HttpResponse::Ok().json(serde_json::json!({
+                    "status": "success",
+                    "data": response,
+                    "meta": {
+                        "current_page": params.page,
+                        "per_page": limit,
+                        "total_count": total_count,
+                        "total_pages": total_pages,
+                        "has_next": params.page < total_pages,
+                        "has_previous": params.page > 1
+                    }
+                }))
+            }
         }
         (Err(e), _) => {
             eprintln!("Database error: {}", e);
@@ -78,7 +152,6 @@ pub async fn create_post(
     params: web::Json<CreatePostRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    // 1. Достаём токен из заголовка Authorization: Bearer <token>
     let token = match req
         .headers()
         .get("Authorization")
@@ -92,7 +165,6 @@ pub async fn create_post(
         }
     };
 
-    // 2. Декодируем JWT и извлекаем user_id из поля sub
     let author_id = match decode::<Claims>(
         &token,
         &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
@@ -130,7 +202,20 @@ pub async fn create_post(
     .await;
 
     match result {
-        Ok(post) => HttpResponse::Created().json(post),
+        Ok(post) => {
+            let response = CreatePostResponse {
+                id: post.id,
+                author: post.author,
+                title: post.title,
+                content: post.content,
+                created_at: post.created_at,
+                updated_at: post.updated_at,
+            };
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": response,
+            }))
+        }
         Err(e) => {
             eprintln!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
