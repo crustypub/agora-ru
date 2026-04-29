@@ -9,6 +9,12 @@ fn default_page() -> i64 {
 fn default_limit() -> i64 {
     10
 }
+#[derive(Debug, Deserialize, Serialize)]  
+enum PostRatingMode {
+    Increment,
+    Decrement
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Author {
     pub id: Uuid,
@@ -94,4 +100,10 @@ pub struct CreatePostRequest {
 
     #[validate(length(min = 1, max = 10000))]
     pub content: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct PostRatingRequest {
+    pub post_id: Uuid,
+    pub mode: PostRatingMode,
 }

@@ -1,5 +1,5 @@
 use crate::models::app::AppState;
-use crate::models::post::{CreatePostResponse, PostParams, PostResponse};
+use crate::models::post::{CreatePostResponse, PostParams, PostRatingRequest, PostResponse};
 use crate::{handlers::auth::Claims, models::post::CreatePost};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
@@ -68,8 +68,12 @@ pub async fn get_posts(
                     }
                 };
 
-                let rating_plus_result = posts.iter().any(|x: &Post| x.rating_plus.contains(&author_id));
-                let rating_minus_result = posts.iter().any(|x: &Post| x.rating_minus.contains(&author_id));
+                let rating_plus_result = posts
+                    .iter()
+                    .any(|x: &Post| x.rating_plus.contains(&author_id));
+                let rating_minus_result = posts
+                    .iter()
+                    .any(|x: &Post| x.rating_minus.contains(&author_id));
 
                 let response: Vec<PostResponse> = posts
                     .into_iter()
@@ -101,7 +105,6 @@ pub async fn get_posts(
                     }
                 }))
             } else {
-    
                 let response: Vec<PostResponse> = posts
                     .into_iter()
                     .map(|post| PostResponse {
@@ -224,4 +227,14 @@ pub async fn create_post(
             }))
         }
     }
+}
+
+#[post("/post_rating")]
+pub async fn post_rating_increment(
+    req: HttpRequest,
+    params: web::Json<PostRatingRequest>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    return HttpResponse::Unauthorized()
+        .json(serde_json::json!({ "error": "Invalid or expired token" }));
 }
