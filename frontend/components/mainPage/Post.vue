@@ -12,7 +12,9 @@
                         data.author.username }}
                     </NuxtLink>
                     <div class="post-footer__separator" />
-                    <span class="post-footer__created_at">{{ postFormatDateTime(data.created_at) }}</span>
+                    <ClientOnly>
+                        <span class="post-footer__created_at">{{ postFormatDateTime(data.created_at) }}</span>
+                    </ClientOnly>
                 </div>
                 <div class="post-footer__action-btns">
                     <UButton 
