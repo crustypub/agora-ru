@@ -10,7 +10,7 @@ fn default_limit() -> i64 {
     10
 }
 #[derive(Debug, Deserialize, Serialize)]  
-enum PostRatingMode {
+pub enum PostRatingMode {
     Increment,
     Decrement
 }

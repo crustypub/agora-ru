@@ -1,5 +1,7 @@
 use crate::models::app::AppState;
-use crate::models::post::{CreatePostResponse, PostParams, PostRatingRequest, PostResponse};
+use crate::models::post::{
+    CreatePostResponse, PostParams, PostRatingMode, PostRatingRequest, PostResponse,
+};
 use crate::{handlers::auth::Claims, models::post::CreatePost};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
@@ -230,11 +232,115 @@ pub async fn create_post(
 }
 
 #[post("/post_rating")]
-pub async fn post_rating_increment(
+pub async fn post_rating_update(
     req: HttpRequest,
     params: web::Json<PostRatingRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    return HttpResponse::Unauthorized()
-        .json(serde_json::json!({ "error": "Invalid or expired token" }));
+    let token = match req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+    {
+        Some(t) => t.to_string(),
+        None => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({ "error": "Missing or invalid Authorization header" }));
+        }
+    };
+
+    let author_id = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims.sub,
+        Err(e) => {
+            eprintln!("JWT decode error: {}", e);
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({ "error": "Invalid or expired token" }));
+        }
+    };
+
+    match params.mode {
+        PostRatingMode::Increment => {
+            let result = sqlx::query(
+                r#"
+                UPDATE posts 
+                SET 
+                    rating_plus = array_append(rating_plus, $1),
+                    rating_minus = array_remove(rating_minus, $1)
+                WHERE id = $2
+            "#,
+            )
+            .bind(author_id)
+            .bind(params.post_id)
+            .execute(&state.pool)
+            .await;
+            match result {
+                Ok(rows_affected) => {
+                    if rows_affected.rows_affected() == 0 {
+                        // Пост не найден
+                        HttpResponse::NotFound().json(serde_json::json!({
+                            "status": "error",
+                            "error": "Post not found",
+                            "post_id": params.post_id.to_string()
+                        }))
+                    } else {
+                        // Пост успешно обновлён
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                        }))
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Database error: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to update post",
+                        "details": e.to_string()
+                    }))
+                }
+            }
+        }
+        PostRatingMode::Decrement => {
+            let result = sqlx::query(
+                r#"
+                UPDATE posts 
+                SET 
+                    rating_minus = array_append(rating_minus, $1),
+                    rating_plus = array_remove(rating_plus, $1)
+                WHERE id = $2
+            "#,
+            )
+            .bind(author_id)
+            .bind(params.post_id)
+            .execute(&state.pool)
+            .await;
+            match result {
+                Ok(rows_affected) => {
+                    if rows_affected.rows_affected() == 0 {
+                        // Пост не найден
+                        HttpResponse::NotFound().json(serde_json::json!({
+                            "status": "error",
+                            "error": "Post not found",
+                            "post_id": params.post_id.to_string()
+                        }))
+                    } else {
+                        // Пост успешно обновлён
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                        }))
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Database error: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to update post",
+                        "details": e.to_string()
+                    }))
+                }
+            }
+        }
+    }
 }

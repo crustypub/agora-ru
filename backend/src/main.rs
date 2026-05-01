@@ -13,6 +13,8 @@ use handlers::{
 };
 use models::app::AppState;
 
+use crate::handlers::post::post_rating_update;
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
@@ -50,6 +52,7 @@ async fn main() -> std::io::Result<()> {
                 .service(telegram_auth)
                 .service(get_posts)
                 .service(create_post)
+                .service(post_rating_update)
         )
     })
     .bind(("0.0.0.0", 6080))?
