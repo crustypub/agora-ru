@@ -8,6 +8,74 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 
 use crate::models::post::{CreatePostRequest, Post};
 
+/// Извлекает JWT из запроса.
+/// Порядок приоритета:
+///   1. `Authorization: Bearer <token>` — для API-клиентов (Postman, curl и т.д.)
+///   2. Cookie `auth_token`             — для браузерных запросов (HttpOnly, JS не может читать)
+fn extract_jwt(req: &HttpRequest) -> Option<String> {
+    // 1. Authorization: Bearer <token> (приоритет — не ломает API-клиентов)
+    if let Some(token) = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(|t| t.to_string())
+    {
+        return Some(token);
+    }
+
+    // 2. Cookie auth_token (для браузерных SSR/CSR запросов)
+    if let Some(cookie_header) = req.headers().get("cookie") {
+        if let Ok(cookie_str) = cookie_header.to_str() {
+            for part in cookie_str.split(';') {
+                let mut kv = part.trim().splitn(2, '=');
+                if let (Some(key), Some(value)) = (kv.next(), kv.next()) {
+                    if key.trim() == "auth_token" {
+                        return Some(value.trim().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn get_posts_anonymous(posts: Vec<Post>, total_count: i64, params: &PostParams) -> HttpResponse {
+    let limit = params.limit;
+    let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
+
+    let response: Vec<PostResponse> = posts
+        .into_iter()
+        .map(|post| PostResponse {
+            id: post.id,
+            author: post.author,
+            title: post.title,
+            content: post.content,
+            rating_plus: post.rating_plus.len(),
+            rating_minus: post.rating_minus.len(),
+            comments_count: post.comments_count,
+            created_at: post.created_at,
+            updated_at: post.updated_at,
+            is_liked: false,
+            is_disliked: false,
+        })
+        .collect();
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "data": response,
+        "meta": {
+            "current_page": params.page,
+            "per_page": limit,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": params.page < total_pages,
+            "has_previous": params.page > 1
+        }
+    }))
+}
+
 #[get("/post")]
 pub async fn get_posts(
     req: HttpRequest,
@@ -48,12 +116,7 @@ pub async fn get_posts(
     match (posts_result, count_result) {
         (Ok(posts), Ok(total_count)) => {
             let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
-            let token: Option<String> = req
-                .headers()
-                .get("Authorization")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.strip_prefix("Bearer "))
-                .map(|t| t.to_string());
+            let token: Option<String> = extract_jwt(&req);
 
             if let Some(t) = token {
                 // Логика для авторизованного юзера
@@ -64,9 +127,10 @@ pub async fn get_posts(
                 ) {
                     Ok(data) => data.claims.sub,
                     Err(e) => {
-                        eprintln!("JWT decode error: {}", e);
-                        return HttpResponse::Unauthorized()
-                            .json(serde_json::json!({ "error": "Invalid or expired token" }));
+                        // get_posts — публичный эндпоинт: протухший/невалидный токен
+                        // не должен блокировать запрос, отдаём как анонимному пользователю.
+                        eprintln!("JWT decode error (treating as anonymous): {}", e);
+                        return get_posts_anonymous(posts, total_count, &params);
                     }
                 };
 
@@ -107,35 +171,7 @@ pub async fn get_posts(
                     }
                 }))
             } else {
-                let response: Vec<PostResponse> = posts
-                    .into_iter()
-                    .map(|post| PostResponse {
-                        id: post.id,
-                        author: post.author,
-                        title: post.title,
-                        content: post.content,
-                        rating_plus: post.rating_plus.len(),
-                        rating_minus: post.rating_minus.len(),
-                        comments_count: post.comments_count,
-                        created_at: post.created_at,
-                        updated_at: post.updated_at,
-                        is_disliked: false,
-                        is_liked: false,
-                    })
-                    .collect();
-
-                HttpResponse::Ok().json(serde_json::json!({
-                    "status": "success",
-                    "data": response,
-                    "meta": {
-                        "current_page": params.page,
-                        "per_page": limit,
-                        "total_count": total_count,
-                        "total_pages": total_pages,
-                        "has_next": params.page < total_pages,
-                        "has_previous": params.page > 1
-                    }
-                }))
+                get_posts_anonymous(posts, total_count, &params)
             }
         }
         (Err(e), _) => {
@@ -157,16 +193,11 @@ pub async fn create_post(
     params: web::Json<CreatePostRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match req
-        .headers()
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-    {
-        Some(t) => t.to_string(),
+    let token = match extract_jwt(&req) {
+        Some(t) => t,
         None => {
             return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Missing or invalid Authorization header" }));
+                .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }));
         }
     };
 
@@ -237,16 +268,11 @@ pub async fn post_rating_update(
     params: web::Json<PostRatingRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match req
-        .headers()
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-    {
-        Some(t) => t.to_string(),
+    let token = match extract_jwt(&req) {
+        Some(t) => t,
         None => {
             return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Missing or invalid Authorization header" }));
+                .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }));
         }
     };
 

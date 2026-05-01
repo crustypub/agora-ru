@@ -43,6 +43,7 @@ async fn main() -> std::io::Result<()> {
                 http::header::AUTHORIZATION,
                 http::header::ACCEPT,
                 http::header::CONTENT_TYPE,
+                http::header::COOKIE, // нужен, иначе actix-cors отрезает заголовок auth_token
             ])
             .supports_credentials()
             .max_age(3600);
