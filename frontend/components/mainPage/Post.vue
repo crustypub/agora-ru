@@ -21,11 +21,11 @@
                 </div>
                 <div class="post-footer__action-btns">
                     <UButton icon="material-symbols:mode-comment-outline-rounded" size="xs" color="neutral"
-                        variant="subtle">{{ Number(data?.comments_count) || 0 }}</UButton>
-                    <UButton icon="material-symbols:remove" size="xs" color="error" variant="subtle">{{
-                        Number(data?.comments_count) || 0 }}</UButton>
-                    <UButton icon="material-symbols:add" size="xs" color="secondary" variant="subtle">{{
-                        Number(data?.comments_count) || 0 }}</UButton>
+                        variant="subtle">{{ Number(postData?.comments_count) || 0 }}</UButton>
+                    <UButton icon="material-symbols:remove" size="xs" color="red" variant="subtle">{{
+                        Number(postData?.rating_minus) || 0 }}</UButton>
+                    <UButton icon="material-symbols:add" size="xs" color="green" variant="subtle">{{
+                        Number(postData?.rating_plus) || 0 }}</UButton>
                 </div>
             </div>
         </div>
@@ -41,7 +41,18 @@ interface IProps {
 
 const { data } = defineProps<IProps>();
 
-console.log('data', data);
+const postData = ref<IPostResponseItem>(data);
+
+console.log('data', postData.value);
+
+const incrementRating = async function() {
+    try {
+        
+        
+    } catch(e) {
+        console.error(e);
+    }
+}
 
 </script>
 
