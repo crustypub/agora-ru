@@ -1,7 +1,6 @@
 use crate::models::app::AppState;
 use crate::models::post::{
-    CreatePostResponse, PostParams, PostRatingMode, PostRatingOperationType, PostRatingRequest,
-    PostRatingType, PostResponse,
+    CreatePostResponse, PostParams, PostRatingMode, PostRatingOperationType, PostRatingRequest, PostResponse
 };
 use crate::{handlers::auth::Claims, models::post::CreatePost};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
