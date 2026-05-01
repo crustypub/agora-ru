@@ -2,27 +2,30 @@
     <div class="post-container">
         <UAvatar :src="data?.author?.avatar_url || ''" :alt="data?.author?.first_name || '.'" size="md" />
         <div class="post-content">
-            <span class="post-content__title">
-                {{ data.title }}
-            </span>
+            <div class="post-header">
+                <span class="post-content__title">
+                    {{ data.title }}
+                </span>
+                <div class="post-header__time">
+                    <ClientOnly>
+                        <span class="post-footer__created_at">{{ postFormatDateTime(data.created_at) }}</span>
+                    </ClientOnly>
+                </div>
+            </div>
             <div class="post-footer">
                 <div class="post-footer__user">
                     <span class="post-footer__name" v-if="data?.author?.first_name">{{ data.author.first_name }}</span>
                     <NuxtLink to="/" class="post-footer__username" v-if="data?.author?.username">@{{
                         data.author.username }}
                     </NuxtLink>
-                    <div class="post-footer__separator" />
-                    <ClientOnly>
-                        <span class="post-footer__created_at">{{ postFormatDateTime(data.created_at) }}</span>
-                    </ClientOnly>
                 </div>
                 <div class="post-footer__action-btns">
-                    <UButton 
-                        icon="material-symbols:mode-comment-outline-rounded"
-                        size="xs"
-                        color="primary"
-                        variant="subtle"
-                    >{{ Number(data?.comments_count) || 0}}</UButton>
+                    <UButton icon="material-symbols:mode-comment-outline-rounded" size="xs" color="neutral"
+                        variant="subtle">{{ Number(data?.comments_count) || 0 }}</UButton>
+                    <UButton icon="material-symbols:remove" size="xs" color="error" variant="subtle">{{
+                        Number(data?.comments_count) || 0 }}</UButton>
+                    <UButton icon="material-symbols:add" size="xs" color="secondary" variant="subtle">{{
+                        Number(data?.comments_count) || 0 }}</UButton>
                 </div>
             </div>
         </div>
@@ -44,7 +47,7 @@ console.log('data', data);
 
 <style lang="scss" scoped>
 .post-container {
-    min-width: 100%;
+    width: 100%;
     min-height: 2rem;
     height: max-content;
     display: flex;
@@ -52,6 +55,7 @@ console.log('data', data);
     background-color: $white-off;
     align-items: center;
     column-gap: .5rem;
+    font-size: 11px;
 }
 
 .post-content {
@@ -59,11 +63,34 @@ console.log('data', data);
     height: 100%;
     display: flex;
     flex-direction: column;
+    min-width: 0;
 
     &__title {
         color: $gray-800;
-        font-size: $text-md;
+        font-size: $text-base;
         font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+}
+
+.post-header {
+    width: 100%;
+    height: max-content;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    overflow: hidden;
+    row-gap: 4px;
+    column-gap: 8px;
+
+    &__time {
+        width: max-content;
+        display: flex;
+        justify-content: flex-end;
+        flex-shrink: 0;
     }
 }
 
@@ -79,20 +106,23 @@ console.log('data', data);
         column-gap: 4px;
     }
 
-    &__username {
-        color: $blue-light;
+    &__name {
+        font-size: 1em;
     }
 
-    &__separator {
-        width: 3px;
-        height: 3px;
-        border-radius: 50%;
-        background-color: $gray-800;
+    &__username {
+        color: $blue-light;
     }
 
     &__created_at {
         font-size: $text-xs;
         color: $gray-600;
+        white-space: nowrap;
+    }
+
+    &__action-btns {
+        display: flex;
+        column-gap: 8px;
     }
 }
 </style>
