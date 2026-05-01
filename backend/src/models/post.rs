@@ -15,6 +15,13 @@ pub enum PostRatingMode {
     Decrement
 }
 
+#[derive(Debug, Deserialize, Serialize)]  
+pub enum PostRatingOperationType {
+    Add,
+    Remove
+}
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Author {
     pub id: Uuid,
@@ -106,4 +113,5 @@ pub struct CreatePostRequest {
 pub struct PostRatingRequest {
     pub post_id: Uuid,
     pub mode: PostRatingMode,
+    pub operation_type: PostRatingOperationType, 
 }
