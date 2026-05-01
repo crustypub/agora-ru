@@ -351,12 +351,12 @@ pub async fn post_rating_update(
             match params.mode {
                 PostRatingMode::Increment => {
                     let result = sqlx::query(
-                        r#"
-                UPDATE posts 
-                SET 
-                    rating_plus = array_remove(rating_plus, $1),
-                WHERE id = $2
-            "#,
+                    r#"
+                        UPDATE posts 
+                        SET 
+                            rating_plus = array_remove(rating_plus, $1)
+                        WHERE id = $2
+                    "#,
                     )
                     .bind(author_id)
                     .bind(params.post_id)
@@ -389,12 +389,12 @@ pub async fn post_rating_update(
                 }
                 PostRatingMode::Decrement => {
                     let result = sqlx::query(
-                        r#"
-                UPDATE posts 
-                SET 
-                    rating_minus = array_remove(rating_minus, $1),
-                WHERE id = $2
-            "#,
+                    r#"
+                        UPDATE posts 
+                        SET 
+                            rating_minus = array_remove(rating_minus, $1)
+                        WHERE id = $2
+                    "#,
                     )
                     .bind(author_id)
                     .bind(params.post_id)
