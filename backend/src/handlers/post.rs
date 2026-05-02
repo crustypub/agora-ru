@@ -134,27 +134,24 @@ pub async fn get_posts(
                     }
                 };
 
-                let rating_plus_result = posts
-                    .iter()
-                    .any(|x: &Post| x.rating_plus.contains(&author_id));
-                let rating_minus_result = posts
-                    .iter()
-                    .any(|x: &Post| x.rating_minus.contains(&author_id));
-
                 let response: Vec<PostResponse> = posts
                     .into_iter()
-                    .map(|post| PostResponse {
-                        id: post.id,
-                        author: post.author,
-                        title: post.title,
-                        content: post.content,
-                        rating_plus: post.rating_plus.len(),
-                        rating_minus: post.rating_minus.len(),
-                        comments_count: post.comments_count,
-                        created_at: post.created_at,
-                        updated_at: post.updated_at,
-                        is_liked: rating_plus_result,
-                        is_disliked: rating_minus_result,
+                    .map(|post| {
+                        let is_liked = post.rating_plus.contains(&author_id);
+                        let is_disliked = post.rating_minus.contains(&author_id);
+                        PostResponse {
+                            id: post.id,
+                            author: post.author,
+                            title: post.title,
+                            content: post.content,
+                            rating_plus: post.rating_plus.len(),
+                            rating_minus: post.rating_minus.len(),
+                            comments_count: post.comments_count,
+                            created_at: post.created_at,
+                            updated_at: post.updated_at,
+                            is_liked,
+                            is_disliked,
+                        }
                     })
                     .collect();
 
