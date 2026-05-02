@@ -19,3 +19,5 @@ export interface IPostResponseItem {
     is_liked: boolean,
     is_disliked: boolean,
 }
+
+export type PostRatingUpdateMode = 'Increment' | 'Decrement';

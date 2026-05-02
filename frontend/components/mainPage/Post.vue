@@ -21,19 +21,22 @@
                 </div>
                 <div class="post-footer__action-btns">
                     <UButton icon="material-symbols:mode-comment-outline-rounded" size="xs" color="neutral"
-                        variant="subtle">{{ Number(postData?.comments_count) || 0 }}</UButton>
-                    <UButton icon="material-symbols:remove" size="xs" color="red" variant="subtle">{{
-                        Number(postData?.rating_minus) || 0 }}</UButton>
-                    <UButton icon="material-symbols:add" size="xs" color="green" variant="subtle">{{
-                        Number(postData?.rating_plus) || 0 }}</UButton>
+                        variant="ghost">{{ Number(postData?.comments_count) || 0 }}</UButton>
+                    <UButton icon="material-symbols:remove" size="xs" color="red" :variant="postData?.is_disliked ? 'subtle' : 'ghost'"
+                        @click="() => updatePostRating('Decrement', postData.is_disliked, postData.id)">{{
+                            Number(postData?.rating_minus) || 0 }}</UButton>
+                    <UButton icon="material-symbols:add" size="xs" color="green" :variant="postData?.is_liked ? 'subtle' : 'ghost'"
+                        @click="() => updatePostRating('Increment', postData.is_liked, postData.id)">{{
+                            Number(postData?.rating_plus) || 0 }}</UButton>
                 </div>
             </div>
         </div>
     </div>
 </template>
 <script setup lang="ts">
+import { useApiCall } from '~/composables/useApi';
 import { postFormatDateTime } from '~/helpers/common';
-import type { IPostResponseItem } from '~/models/entities/post.entities';
+import type { IPostResponseItem, PostRatingUpdateMode } from '~/models/entities/post.entities';
 
 interface IProps {
     data: IPostResponseItem
@@ -45,11 +48,41 @@ const postData = ref<IPostResponseItem>(data);
 
 console.log('data', postData.value);
 
-const incrementRating = async function() {
+const updatePostRating = async function (mode: PostRatingUpdateMode, isClicked: boolean, postId: string) {
+    const postDataSnapshot: IPostResponseItem = { ...postData.value };
     try {
-        
-        
-    } catch(e) {
+
+        const requestData = {
+            post_id: postId,
+            mode: mode,
+            operation_type: isClicked ? 'Remove' : 'Add'
+        }
+        if (mode === 'Increment') {
+            postData.value = {
+                ...postData.value,
+                is_liked: !postData.value.is_liked,
+                is_disliked: false,
+                rating_plus: isClicked ? postData.value.rating_plus - 1 : postData.value.rating_plus + 1,
+                rating_minus: postData.value.is_disliked ? postData.value.rating_minus - 1 : postData.value.rating_minus,
+            }
+        }
+
+        else if (mode === 'Decrement') {
+            postData.value = {
+                ...postData.value,
+                is_liked: false,
+                is_disliked: !postData.value.is_disliked,
+                rating_plus: postData.value.is_liked ? postData.value.rating_plus - 1 : postData.value.rating_plus,
+                rating_minus: isClicked ? postData.value.rating_minus - 1 : postData.value.rating_minus + 1,
+            }
+        }
+
+        await useApiCall('/api/post_rating', {
+            method: 'POST',
+            body: requestData,
+        })
+    } catch (e) {
+        postData.value = postDataSnapshot
         console.error(e);
     }
 }

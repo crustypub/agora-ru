@@ -1,5 +1,3 @@
-// baseURL не нужен: запросы /api/** перехватывает серверный прокси Nuxt (server/api/[...path].ts),
-// который сам пересылает их на backend. Работает одинаково при SSR и на клиенте.
 export const useApi = <T>(url: string, options: any = {}) => {
   const { headers: optionHeaders, ...restOptions } = options
 
@@ -12,5 +10,14 @@ export const useApi = <T>(url: string, options: any = {}) => {
       ...(optionHeaders ?? {}),         // заголовки из options НЕ перетирают куки
     },
     ...restOptions,
+  })
+}
+
+// Для императивных вызовов внутри функций (click-хэндлеры, экшены и т.д.)
+// $fetch кидает FetchError при 4xx/5xx — try/catch работает нативно.
+export const useApiCall = <T>(url: string, options: any = {}) => {
+  return $fetch<T>(url, {
+    credentials: 'include',
+    ...options,
   })
 }
