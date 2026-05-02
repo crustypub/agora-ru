@@ -50,6 +50,12 @@ const navItems = computed<NavigationMenuItem[]>(() => [
         active: route.path === '/',
     },
     {
+        label: 'Wiki',
+        to: '/wiki',
+        icon: 'material-symbols:book-ribbon-outline',
+        active: route.path.startsWith('/wiki'),
+    },
+    {
         label: 'Объявления',
         to: '/discussions',
         icon: 'ic:outline-shopping-basket',
