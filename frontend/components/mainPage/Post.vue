@@ -46,8 +46,6 @@ const { data } = defineProps<IProps>();
 
 const postData = ref<IPostResponseItem>(data);
 
-console.log('data', postData.value);
-
 const updatePostRating = async function (mode: PostRatingUpdateMode, isClicked: boolean, postId: string) {
     const postDataSnapshot: IPostResponseItem = { ...postData.value };
     try {
