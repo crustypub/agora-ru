@@ -12,5 +12,6 @@ INSERT INTO wiki_types (id, title) VALUES
     (gen_random_uuid(), 'Жильё и быт'),
     (gen_random_uuid(), 'Медицина и страхование'),
     (gen_random_uuid(), 'Работа и налоги'),
-    (gen_random_uuid(), 'Безопасность и чрезвычайные ситуации')
+    (gen_random_uuid(), 'Безопасность и чрезвычайные ситуации'),
+    (gen_random_uuid(), 'Другое')
 ON CONFLICT (title) DO NOTHING;
