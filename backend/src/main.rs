@@ -13,7 +13,7 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::handlers::post::post_rating_update;
+use crate::handlers::{post::post_rating_update, wiki::get_wiki_types};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -54,6 +54,7 @@ async fn main() -> std::io::Result<()> {
                 .service(get_posts)
                 .service(create_post)
                 .service(post_rating_update)
+                .service(get_wiki_types)
         )
     })
     .bind(("0.0.0.0", 6080))?
