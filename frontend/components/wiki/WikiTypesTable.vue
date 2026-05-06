@@ -1,13 +1,9 @@
 <template>
     <div class="wiki-types">
-        <template v-if="Array.isArray(response?.data)">
-            <NuxtLink
-                v-for="item in response.data"
-                :key="item.id"
-                :to="`/wiki/type/${item.id}`"
-                class="wiki-types__card"
-            >
-                <UIcon :name="getWikiTypeIcon(item.title)" class="wiki-types__icon"/>
+        <template v-if="Array.isArray(data)">
+            <NuxtLink v-for="item in data" :key="item.id" :to="`/wiki/type/${item.id}`"
+                class="wiki-types__card">
+                <UIcon :name="getWikiTypeIcon(item.title)" class="wiki-types__icon" />
                 <span class="wiki-types__title">{{ item.title }}</span>
                 <UIcon name="material-symbols:arrow-forward" class="wiki-types__arrow" />
             </NuxtLink>
@@ -16,9 +12,15 @@
 </template>
 
 <script setup lang="ts">
-import type { IWikiTypesResponse } from '~/models/api/wiki.api';
+import type { IWikiTypeResponseItem } from '~/models/entities/wiki.entities';
 
-const { data: response } = await useApi<IWikiTypesResponse>('/api/wiki_types');
+
+interface Props {
+    data: IWikiTypeResponseItem[] | undefined,
+}
+
+const { data } = defineProps<Props>();
+
 
 function getWikiTypeIcon(title: string): string {
     switch (title) {
@@ -47,7 +49,7 @@ function getWikiTypeIcon(title: string): string {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 16px;
-    padding: 2rem 0;
+    padding: 1rem 0;
 
     &__card {
         display: flex;
