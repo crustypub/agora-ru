@@ -4,7 +4,7 @@
             <NuxtLink
                 v-for="item in response.data"
                 :key="item.id"
-                :to="`/wiki/${item.id}`"
+                :to="`/wiki/type/${item.id}`"
                 class="wiki-types__card"
             >
                 <UIcon :name="getWikiTypeIcon(item.title)" class="wiki-types__icon"/>
@@ -48,7 +48,6 @@ function getWikiTypeIcon(title: string): string {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 16px;
     padding: 2rem 0;
-    overflow-y: auto;
 
     &__card {
         display: flex;
