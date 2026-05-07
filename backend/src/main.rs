@@ -9,11 +9,10 @@ mod models;
 use db::setup::setup_db;
 use handlers::{
     auth::telegram_auth,
-    post::{create_post, get_posts},
+    post::{create_post, get_posts, post_rating_update},
+    wiki::{create_wiki_article, get_wiki_types},
 };
 use models::app::AppState;
-
-use crate::handlers::{post::post_rating_update, wiki::get_wiki_types};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -55,6 +54,7 @@ async fn main() -> std::io::Result<()> {
                 .service(create_post)
                 .service(post_rating_update)
                 .service(get_wiki_types)
+                .service(create_wiki_article),
         )
     })
     .bind(("0.0.0.0", 6080))?

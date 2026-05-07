@@ -12,10 +12,45 @@ pub struct WikiType {
 }
 
 
-#[derive(Debug, Deserialize, Serialize, Validate)]
+#[derive(Debug, FromRow, Deserialize, Serialize, Validate)]
 pub struct WikiTypeResponse {
     pub id: Uuid,
     pub title: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateWikiArticleRequest {
+    #[validate(length(min = 1, max = 255))]
+    pub title: String,
+
+    #[validate(length(min = 1, max = 100000))]
+    pub content: String,
+
+    pub wiki_type_id: Uuid,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct CreateWikiArticle {
+    pub id: Uuid,
+    pub title: String,
+    pub wiki_type_id: Uuid,
+    pub created_by: Uuid,
+    pub last_edited_by: Uuid,
+    pub is_confirmed: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct CreateWikiArticleResponse {
+    pub id: Uuid,
+    pub title: String,
+    pub wiki_type: WikiTypeResponse,
+    pub created_by: Uuid,
+    pub last_edited_by: Uuid,
+    pub is_confirmed: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
