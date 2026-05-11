@@ -1,40 +1,35 @@
 <template>
-  <form class="md-editor-form" @submit.prevent="handleSubmit">
+  <UForm :schema="schema" :state="state" class="md-editor-form" @submit="handleSubmit">
 
-    <USelect
-      v-model="selectedType"
-      :items="typeOptions"
-      value-attribute="value"
-      option-attribute="label"
-      placeholder="Выберите тип статьи"
-      :required="true"
-      class="md-editor-form__select"
-    />
+    <div class="md-editor-form__row">
+      <UFormField label="Тип статьи" name="type" required class="md-editor-form__row-field">
+        <USelect v-model="state.type" :items="typeOptions" value-attribute="value" option-attribute="label"
+          placeholder="Выберите тип статьи" class="w-full"/>
+      </UFormField>
 
-    <ClientOnly>
-      <MdEditor
-        v-model="markdownContent"
-        language="en-US"
-        :toolbars="activeToolbars"
-        class="md-editor__wrapper"
-      />
-    </ClientOnly>
+      <UFormField label="Заголовок" name="title" required class="md-editor-form__row-field">
+        <UInput v-model="state.title" placeholder="Введите заголовок статьи" class="w-full" />
+      </UFormField>
+    </div>
 
-    <UButton
-      type="submit"
-      :disabled="!selectedType || !markdownContent.trim()"
-      class="md-editor-form__submit"
-    >
+    <UFormField label="Содержимое" name="content" required>
+      <ClientOnly>
+        <MdEditor v-model="state.content" language="en-US" :toolbars="activeToolbars" class="md-editor__wrapper" />
+      </ClientOnly>
+    </UFormField>
+
+    <UButton type="submit" class="md-editor-form__submit">
       Сохранить
     </UButton>
 
-  </form>
+  </UForm>
 </template>
 
 <script setup lang="ts">
 import { MdEditor } from 'md-editor-v3';
 import type { ToolbarNames } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
+import { z } from 'zod';
 import type { IWikiTypeResponseItem } from '~/models/entities/wiki.entities';
 
 interface Props {
@@ -43,8 +38,19 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const markdownContent = ref('');
-const selectedType = ref<string | undefined>(undefined);
+const schema = z.object({
+  type: z.string({ error: 'Выберите тип статьи' }).min(1, 'Выберите тип статьи'),
+  title: z.string({ error: 'Введите заголовок' }).min(1, 'Введите заголовок'),
+  content: z.string({ error: 'Введите содержимое' }).min(1, 'Введите содержимое'),
+});
+
+type ArticleFormState = z.output<typeof schema>;
+
+const state = reactive({
+  type: undefined as string | undefined,
+  title: '',
+  content: '',
+});
 
 const typeOptions = computed(() =>
   (props.wikiTypes ?? []).map((t) => ({ value: t.id, label: t.title }))
@@ -56,7 +62,7 @@ const DESKTOP_TOOLBARS: ToolbarNames[] = [
   'title', 'quote', 'unorderedList', 'orderedList', '-',
   'link', 'image', 'table', 'code', 'codeRow', '-',
   'revoke', 'next', '=',
-  'pageFullscreen', 'fullscreen', 
+  'pageFullscreen', 'fullscreen',
 ];
 
 const MOBILE_TOOLBARS: ToolbarNames[] = [
@@ -77,8 +83,9 @@ const activeToolbars = computed(() =>
   isMobile.value ? MOBILE_TOOLBARS : DESKTOP_TOOLBARS
 );
 
-function handleSubmit() {
+function handleSubmit(event: { data: ArticleFormState }) {
   // TODO: заполни обработчик самостоятельно
+  console.log(event.data);
 }
 </script>
 
@@ -86,11 +93,22 @@ function handleSubmit() {
 .md-editor-form {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 1rem;
   height: 100%;
 
-  &__select {
-    width: 100%;
+  &__row {
+    display: flex;
+    gap: 1rem;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+
+  &__row-field {
+    flex: 1;
+    min-width: 0;
   }
 
   &__submit {
@@ -103,6 +121,8 @@ function handleSubmit() {
 
   // Увеличиваем зону касания кнопок тулбара на мобильных
   @media (max-width: 768px) {
+    flex: none; // редактор не растягивается, кнопка идёт сразу после него
+
     :deep(.md-editor-toolbar-item) {
       min-width: 40px;
       min-height: 40px;
