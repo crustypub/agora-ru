@@ -5,7 +5,7 @@ use validator::Validate;
 
 #[derive(Debug, FromRow, Serialize)]
 pub struct WikiType {
-    pub id: Uuid,
+    pub id: i32,
     pub title: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -14,7 +14,7 @@ pub struct WikiType {
 
 #[derive(Debug, FromRow, Deserialize, Serialize, Validate)]
 pub struct WikiTypeResponse {
-    pub id: Uuid,
+    pub id: i32,
     pub title: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -28,14 +28,14 @@ pub struct CreateWikiArticleRequest {
     #[validate(length(min = 1, max = 100000))]
     pub content: String,
 
-    pub wiki_type_id: Uuid,
+    pub wiki_type_id: i32,
 }
 
 #[derive(Debug, FromRow, Serialize)]
 pub struct CreateWikiArticle {
     pub id: Uuid,
     pub title: String,
-    pub wiki_type_id: Uuid,
+    pub wiki_type_id: i32,
     pub created_by: Uuid,
     pub last_edited_by: Uuid,
     pub is_confirmed: bool,
