@@ -4,7 +4,7 @@
     <div class="md-editor-form__row">
       <UFormField label="Тип статьи" name="type" required class="md-editor-form__row-field">
         <USelect v-model="state.type" :items="typeOptions" value-attribute="value" option-attribute="label"
-          placeholder="Выберите тип статьи" class="w-full"/>
+          placeholder="Выберите тип статьи" class="w-full" />
       </UFormField>
 
       <UFormField label="Заголовок" name="title" required class="md-editor-form__row-field">
@@ -29,17 +29,20 @@
 import { MdEditor } from 'md-editor-v3';
 import type { ToolbarNames } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import { z } from 'zod';
+import { date, z } from 'zod';
+import { useApiCall } from '~/composables/useApi';
 import type { IWikiTypeResponseItem } from '~/models/entities/wiki.entities';
 
-interface Props {
+interface IProps {
   wikiTypes: IWikiTypeResponseItem[] | undefined;
+  closeModal: () => void;
 }
 
-const props = defineProps<Props>();
+const { wikiTypes, closeModal } = defineProps<IProps>();
+
 
 const schema = z.object({
-  type: z.string({ error: 'Выберите тип статьи' }).min(1, 'Выберите тип статьи'),
+  type: z.number({ error: 'Выберите тип статьи' }).min(1, 'Выберите тип статьи'),
   title: z.string({ error: 'Введите заголовок' }).min(1, 'Введите заголовок'),
   content: z.string({ error: 'Введите содержимое' }).min(1, 'Введите содержимое'),
 });
@@ -47,13 +50,13 @@ const schema = z.object({
 type ArticleFormState = z.output<typeof schema>;
 
 const state = reactive({
-  type: undefined as string | undefined,
+  type: undefined as number | undefined,
   title: '',
   content: '',
 });
 
 const typeOptions = computed(() =>
-  (props.wikiTypes ?? []).map((t) => ({ value: t.id, label: t.title }))
+  (wikiTypes ?? []).map((t) => ({ value: t.id, label: t.title }))
 );
 
 // На мобильных — только самые нужные кнопки, чтобы каждая была крупнее
@@ -83,9 +86,23 @@ const activeToolbars = computed(() =>
   isMobile.value ? MOBILE_TOOLBARS : DESKTOP_TOOLBARS
 );
 
-function handleSubmit(event: { data: ArticleFormState }) {
-  // TODO: заполни обработчик самостоятельно
-  console.log(event.data);
+async function handleSubmit(event: { data: ArticleFormState }) {
+  try {
+    const requestData = {
+      title: event?.data?.title,
+      content: event?.data?.content,
+      wiki_type_id: event?.data?.type,
+    }
+    await useApiCall('/api/wiki', {
+      method: 'POST',
+      body: requestData,
+    })
+  } catch (e) {
+
+  }
+  finally {
+    closeModal();
+  }
 }
 </script>
 

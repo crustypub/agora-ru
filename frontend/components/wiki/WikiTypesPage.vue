@@ -1,26 +1,24 @@
 <template>
-    <UModal fullscreen v-model:open="isOpenWikiCreateModal"">
-
-        <template #body>
-            <Placeholder class=" h-48" />
-    <MdEditorWrapperClient :wiki-types="response?.data" />
-</template>
-</UModal>
-<div class="wikitypes-container">
-    <div class="wiki-create">
-        <ClientOnly>
-            <UButton icon="material-symbols:add-circle-outline-rounded" size="lg" color="primary" variant="soft"
-                @click="openModal()">Создать
-                статью</UButton>
-        </ClientOnly>
+    <WikiArticleCreateModal
+        :wiki-types="response?.data"
+        v-model="isOpenWikiCreateModal"
+    />
+    <div class="wikitypes-container">
+        <div class="wiki-create">
+            <ClientOnly>
+                <UButton icon="material-symbols:add-circle-outline-rounded" size="lg" color="primary" variant="soft"
+                    @click="openModal()">Создать
+                    статью</UButton>
+            </ClientOnly>
+        </div>
+        <WikiTypesTable :data="response?.data" />
     </div>
-    <WikiTypesTable :data="response?.data" />
-</div>
 </template>
 <script setup lang="ts">
 import type { IWikiTypesResponse } from '~/models/api/wiki.api';
 import MdEditorWrapperClient from '../mdEditor/MdEditorWrapper.client.vue';
 import WikiTypesTable from './WikiTypesTable.vue';
+import WikiArticleCreateModal from './WikiArticleCreateModal.vue';
 
 const { data: response } = await useApi<IWikiTypesResponse>('/api/wiki_types');
 const isOpenWikiCreateModal = ref(false);
