@@ -1,9 +1,10 @@
 use crate::handlers::auth::Claims;
 use crate::helpers::api::extract_jwt;
 use crate::models::app::AppState;
-use crate::models::wiki::{CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, WikiType, WikiTypeResponse};
+use crate::models::wiki::{CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, WikiType, WikiTypeResponse, Wiki, WikiResponse};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
+use uuid::Uuid;
 
 #[get("/wiki_types")]
 pub async fn get_wiki_types(_req: HttpRequest, state: web::Data<AppState>) -> impl Responder {
@@ -133,6 +134,80 @@ pub async fn create_wiki_article(
             eprintln!("Count error: {}", e);
             HttpResponse::InternalServerError()
                 .json(serde_json::json!({ "error": "Failed to fetch wiki_type" }))
+        }
+    }
+}
+
+#[get("/wiki/{id}")]
+pub async fn get_wiki_article(
+    path: web::Path<Uuid>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let article_id = path.into_inner();
+
+    let wiki_article = sqlx::query_as::<_, Wiki>(
+        r#"
+        SELECT 
+            id, 
+            title, 
+            content,
+            wiki_type_id, 
+            created_by, 
+            last_edited_by,
+            is_confirmed,
+            created_at, 
+            updated_at
+        FROM wiki_articles
+        WHERE id = $1
+        "#,
+    )
+    .bind(article_id)
+    .fetch_optional(&state.pool)
+    .await;
+
+    match wiki_article {
+        Ok(Some(article)) => {
+            let wiki_type = sqlx::query_as::<_, WikiTypeResponse>(
+                r#"
+                SELECT id, title, created_at, updated_at 
+                FROM wiki_types 
+                WHERE id = $1
+                "#,
+            )
+            .bind(article.wiki_type_id)
+            .fetch_one(&state.pool)
+            .await;
+
+            match wiki_type {
+                Ok(w_type) => {
+                    let response = WikiResponse {
+                        id: article.id,
+                        title: article.title,
+                        content: article.content,
+                        wiki_type: w_type,
+                        created_by: article.created_by,
+                        last_edited_by: article.last_edited_by,
+                        is_confirmed: article.is_confirmed,
+                        created_at: article.created_at,
+                        updated_at: article.updated_at,
+                    };
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "status": "success",
+                        "data": response,
+                    }))
+                }
+                Err(e) => {
+                    eprintln!("Database error fetching wiki type: {}", e);
+                    HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": "Failed to fetch wiki type." }))
+                }
+            }
+        }
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({ "error": "Article not found" })),
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": "Failed to fetch wiki article." }))
         }
     }
 }

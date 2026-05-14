@@ -10,7 +10,7 @@ use db::setup::setup_db;
 use handlers::{
     auth::telegram_auth,
     post::{create_post, get_posts, post_rating_update},
-    wiki::{create_wiki_article, get_wiki_types},
+    wiki::{create_wiki_article, get_wiki_types, get_wiki_article},
 };
 use models::app::AppState;
 
@@ -54,7 +54,8 @@ async fn main() -> std::io::Result<()> {
                 .service(create_post)
                 .service(post_rating_update)
                 .service(get_wiki_types)
-                .service(create_wiki_article),
+                .service(create_wiki_article)
+                .service(get_wiki_article),
         )
     })
     .bind(("0.0.0.0", 6080))?
