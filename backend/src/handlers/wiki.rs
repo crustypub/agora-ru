@@ -3,7 +3,7 @@ use crate::helpers::api::extract_jwt;
 use crate::models::app::AppState;
 use crate::models::wiki::{
     CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, WikIArticlesParams,
-    Wiki, WikiResponse, WikiType, WikiTypeResponse,
+    Wiki, WikiType, WikiTypeResponse,
 };
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
@@ -19,7 +19,7 @@ use uuid::Uuid;
 //     let offset = params.offset();
 //     let wiki_type_filter = params.wiki_type;
 
-//     let articles_result = sqlx::query_as::<_, WikiListRow>(
+//     let articles_result = sqlx::query_as::<_, Wiki>(
 //         r#"
 //         SELECT
 //             wa.id,
@@ -277,8 +277,15 @@ pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>)
                 'first_name', uu.first_name,
                 'last_name', uu.last_name,
                 'avatar_url', uu.avatar_url
-            ) as last_edited_by
+            ) as last_edited_by,
+            json_build_object(
+                'id', wt.id,
+                'title', wt.title,
+                'created_at', wt.created_at,
+                'updated_at', wt.updated_at
+            ) as wiki_type
         FROM wiki_articles wa
+        JOIN wiki_types wt ON wa.wiki_type_id = wt.id
         JOIN users cu ON wa.created_by = cu.id
         JOIN users uu ON wa.last_edited_by = uu.id
         WHERE wa.id = $1
@@ -290,45 +297,22 @@ pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>)
 
     match wiki_article {
         Ok(Some(article)) => {
-            // Fetch wiki type
-            let wiki_type_result = sqlx::query_as::<_, WikiTypeResponse>(
-                r#"
-                SELECT id, title, created_at, updated_at
-                FROM wiki_types
-                WHERE id = $1
-                "#,
-            )
-            .bind(article.wiki_type_id)
-            .fetch_one(&state.pool)
-            .await;
-
-            // Fetch created_by user
-
-            match (wiki_type_result) {
-                Ok(w_type) => {
-                    let response = WikiResponse {
-                        id: article.id,
-                        title: article.title,
-                        content: article.content,
-                        wiki_type: w_type,
-                        created_by: article.created_by,
-                        last_edited_by: article.last_edited_by,
-                        is_confirmed: article.is_confirmed,
-                        stars_count: article.stars_count,
-                        created_at: article.created_at,
-                        updated_at: article.updated_at,
-                    };
-                    HttpResponse::Ok().json(serde_json::json!({
-                        "status": "success",
-                        "data": response,
-                    }))
-                }
-                Err(e) => {
-                    eprintln!("Database error fetching wiki type: {}", e);
-                    HttpResponse::InternalServerError()
-                        .json(serde_json::json!({ "error": "Failed to fetch wiki type." }))
-                }
-            }
+            let response = Wiki {
+                id: article.id,
+                title: article.title,
+                content: article.content,
+                wiki_type: article.wiki_type,
+                created_by: article.created_by,
+                last_edited_by: article.last_edited_by,
+                is_confirmed: article.is_confirmed,
+                stars_count: article.stars_count,
+                created_at: article.created_at,
+                updated_at: article.updated_at,
+            };
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": response,
+            }))
         }
         Ok(None) => {
             HttpResponse::NotFound().json(serde_json::json!({ "error": "Article not found" }))

@@ -60,21 +60,7 @@ pub struct Wiki {
     pub id: Uuid,
     pub title: String,
     pub content: String,
-    pub wiki_type_id: i32,
-    pub created_by: Json<Author>,
-    pub last_edited_by: Json<Author>,
-    pub is_confirmed: bool,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub stars_count: i32,
-}
-
-#[derive(Debug, Serialize)]
-pub struct WikiResponse {
-    pub id: Uuid,
-    pub title: String,
-    pub content: String,
-    pub wiki_type: WikiTypeResponse,
+    pub wiki_type: Json<WikiTypeResponse>,
     pub created_by: Json<Author>,
     pub last_edited_by: Json<Author>,
     pub is_confirmed: bool,
