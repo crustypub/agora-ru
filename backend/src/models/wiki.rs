@@ -68,6 +68,18 @@ pub struct Wiki {
     pub updated_at: i64,
     pub stars_count: i32,
 }
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct WikiListItem {
+    pub id: Uuid,
+    pub title: String,
+    pub wiki_type: Json<WikiTypeResponse>,
+    pub created_by: Json<Author>,
+    pub last_edited_by: Json<Author>,
+    pub is_confirmed: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub stars_count: i32,
+}
 
 #[derive(Deserialize)]
 pub struct WikIArticlesParams {
