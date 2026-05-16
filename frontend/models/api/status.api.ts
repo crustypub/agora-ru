@@ -1,1 +1,1 @@
-export type TStatuse = "success" | "error";
+export type TStatus = "success" | "error";

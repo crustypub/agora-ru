@@ -1,7 +1,7 @@
 <template>
     <div class="wiki-types">
         <template v-if="Array.isArray(data)">
-            <NuxtLink v-for="item in data" :key="item.id" :to="`/wiki/type/${item.id}`"
+            <NuxtLink v-for="item in data" :key="item.id" :to="`/wiki/${item.id}`"
                 class="wiki-types__card">
                 <UIcon :name="getWikiTypeIcon(item.title)" class="wiki-types__icon" />
                 <span class="wiki-types__title">{{ item.title }}</span>
