@@ -1,5 +1,6 @@
+use crate::models::app::{default_limit, default_page, Author};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{types::Json, FromRow};
 use uuid::Uuid;
 use validator::Validate;
 
@@ -10,7 +11,6 @@ pub struct WikiType {
     pub created_at: i64,
     pub updated_at: i64,
 }
-
 
 #[derive(Debug, FromRow, Deserialize, Serialize, Validate)]
 pub struct WikiTypeResponse {
@@ -55,17 +55,18 @@ pub struct CreateWikiArticleResponse {
     pub updated_at: i64,
 }
 
-#[derive(Debug, FromRow, Serialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct Wiki {
     pub id: Uuid,
     pub title: String,
     pub content: String,
     pub wiki_type_id: i32,
-    pub created_by: Uuid,
-    pub last_edited_by: Uuid,
+    pub created_by: Json<Author>,
+    pub last_edited_by: Json<Author>,
     pub is_confirmed: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub stars_count: i32,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,9 +75,28 @@ pub struct WikiResponse {
     pub title: String,
     pub content: String,
     pub wiki_type: WikiTypeResponse,
-    pub created_by: Uuid,
-    pub last_edited_by: Uuid,
+    pub created_by: Json<Author>,
+    pub last_edited_by: Json<Author>,
     pub is_confirmed: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub stars_count: i32,
+}
+
+#[derive(Deserialize)]
+pub struct WikIArticlesParams {
+    pub author_id: Option<String>,
+    pub search_value: Option<String>,
+    pub wiki_type: Option<i32>,
+
+    #[serde(default = "default_page")]
+    pub page: i64,
+
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+}
+impl WikIArticlesParams {
+    pub fn offset(&self) -> i64 {
+        (self.page - 1) * self.limit
+    }
 }
