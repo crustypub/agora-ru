@@ -38,31 +38,63 @@ const { data } = defineProps<IProps>();
 
 <style lang="scss" scoped>
 .article {
+    display: flex;
+    flex-direction: column;
+    row-gap: 0.75rem;
     width: 100%;
-    height: auto;
-    padding: 0.5rem 1rem;
-    background-color: $gray-200;
+    padding: 1rem 1.25rem;
+    background-color: $bg-primary;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 4px rgba($black, 0.02);
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba($black, 0.08);
+        border-color: $primary;
+
+        .article__link {
+            color: $primary;
+        }
+    }
 
     &__top {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
+        gap: 1rem;
+    }
+
+    &__link {
+        font-size: $text-md;
+        font-weight: 600;
+        color: $text-primary;
+        transition: color 0.2s ease;
+        line-height: 1.4;
     }
 
     &__info {
-        width: 100%;
-        overflow-x: hidden;
         display: flex;
-        column-gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.25rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid $gray-200;
 
         .user-wrapper {
-            width: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
 
             &__title {
+                font-size: $text-xs;
+                color: $text-muted;
                 white-space: nowrap;
             }
         }
     }
-
 }
 </style>
