@@ -12,11 +12,11 @@
 </template>
 
 <script setup lang="ts">
-import type { IWikiTypeResponseItem } from '~/models/entities/wiki.entities';
+import type { IWikiType } from '~/models/entities/wiki.entities';
 
 
 interface Props {
-    data: IWikiTypeResponseItem[] | undefined,
+    data: IWikiType[] | undefined,
 }
 
 const { data } = defineProps<Props>();

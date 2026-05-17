@@ -8,13 +8,13 @@
 </template>
 
 <script setup lang="ts">
-import type { IWikiTypeResponseItem } from '~/models/entities/wiki.entities';
+import type { IWikiType } from '~/models/entities/wiki.entities';
 import MdEditorWrapperClient from '../mdEditor/MdEditorWrapper.client.vue';
 const model = defineModel<boolean>()
 
 
 interface IProps {
-    wikiTypes: IWikiTypeResponseItem[] | undefined,
+    wikiTypes: IWikiType[] | undefined,
 }
 
 const { wikiTypes } = defineProps<IProps>();

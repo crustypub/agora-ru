@@ -30,6 +30,8 @@ import Footer from '~/components/Footer.vue';
     width: 100%;
     height: 100%;
     flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
     padding: .5rem 1rem;
     max-width: 1150px;
     margin: 0 auto;

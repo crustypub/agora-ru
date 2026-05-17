@@ -1,13 +1,23 @@
-
-import type { IWikiArticleResponeItem, IWikiTypeResponseItem } from "../entities/wiki.entities";
+import type {
+  IWikiArticle,
+  IWikiArticleSimple,
+  IWikiType,
+} from "../entities/wiki.entities";
+import type { IMetaPagination } from "./meta.api";
 import type { TStatus } from "./status.api";
 
 export interface IWikiTypesResponse {
-    data: IWikiTypeResponseItem[],
-    status: TStatus,
+  data: IWikiType[];
+  status: TStatus;
 }
 
 export interface IWikiArticleResponse {
-    data: IWikiArticleResponeItem,
-    status: TStatus
+  data: IWikiArticle;
+  status: TStatus;
+}
+
+export interface IWikiResponse {
+  data: IWikiArticleSimple[];
+  status: TStatus;
+  meta: IMetaPagination;
 }

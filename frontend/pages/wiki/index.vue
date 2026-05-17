@@ -1,23 +1,22 @@
 <template>
   <div class="container">
-    <WikiTypesPage/>
+    <WikiPage />
   </div>
 </template>
 
 <script setup lang="ts">
-import WikiTypesPage from '~/components/wiki/WikiTypesPage.vue';
-
+import WikiPage from "~/components/wiki/WikiPage.vue";
 
 useHead({
-  title: 'Agora RU — Wiki',
-})
+  title: "Agora RU — Wiki",
+});
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .container {
   min-width: 100%;
-  height: 100%;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
 }
-
-
 </style>

@@ -31,10 +31,10 @@ import type { ToolbarNames } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { date, z } from 'zod';
 import { useApiCall } from '~/composables/useApi';
-import type { IWikiTypeResponseItem } from '~/models/entities/wiki.entities';
+import type { IWikiType } from '~/models/entities/wiki.entities';
 
 interface IProps {
-  wikiTypes: IWikiTypeResponseItem[] | undefined;
+  wikiTypes: IWikiType[] | undefined;
   closeModal: () => void;
 }
 
