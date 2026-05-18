@@ -36,9 +36,10 @@ import type { IWikiType } from '~/models/entities/wiki.entities';
 interface IProps {
   wikiTypes: IWikiType[] | undefined;
   closeModal: () => void;
+  submit: () => void;
 }
 
-const { wikiTypes, closeModal } = defineProps<IProps>();
+const { wikiTypes, closeModal, submit} = defineProps<IProps>();
 
 
 const schema = z.object({
@@ -97,6 +98,7 @@ async function handleSubmit(event: { data: ArticleFormState }) {
       method: 'POST',
       body: requestData,
     })
+    submit();
   } catch (e) {
 
   }

@@ -2,7 +2,7 @@
     <UModal fullscreen title="Создание Wiki-статьи" v-model:open="model"">
         <template #body>
             <Placeholder class=" h-48" />
-            <MdEditorWrapperClient :wiki-types="wikiTypes" :close-modal="closeModal"/>
+            <MdEditorWrapperClient :wiki-types="wikiTypes" :close-modal="closeModal" :submit="submit"/>
         </template>
     </UModal>
 </template>
@@ -15,9 +15,10 @@ const model = defineModel<boolean>()
 
 interface IProps {
     wikiTypes: IWikiType[] | undefined,
+    submit: () => void,
 }
 
-const { wikiTypes } = defineProps<IProps>();
+const { wikiTypes, submit } = defineProps<IProps>();
 
 const closeModal = function() {
     model.value = false;
