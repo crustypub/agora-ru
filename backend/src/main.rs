@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{http, web, App, HttpServer};
+use actix_web::{App, HttpServer, http, web::{self, service}};
 
 mod db;
 mod handlers;
@@ -14,7 +14,7 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::handlers::wiki::get_wiki_articles;
+use crate::handlers::wiki::{add_star_to_wiki, get_wiki_articles};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -58,7 +58,8 @@ async fn main() -> std::io::Result<()> {
                 .service(get_wiki_types)
                 .service(create_wiki_article)
                 .service(get_wiki_article)
-                .service(get_wiki_articles),
+                .service(get_wiki_articles)
+                .service(add_star_to_wiki)
         )
     })
     .bind(("0.0.0.0", 6080))?

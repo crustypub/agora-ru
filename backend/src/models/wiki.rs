@@ -98,3 +98,12 @@ impl WikIArticlesParams {
         (self.page - 1) * self.limit
     }
 }
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct CreateWikiStar {
+    pub id: Uuid,
+    pub wiki_id: Uuid,
+    pub user_id: Uuid,
+    pub created_at: i64,
+    pub updated_at: i64,
+}

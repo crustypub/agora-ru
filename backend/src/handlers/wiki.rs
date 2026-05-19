@@ -2,12 +2,21 @@ use crate::handlers::auth::Claims;
 use crate::helpers::api::extract_jwt;
 use crate::models::app::AppState;
 use crate::models::wiki::{
-    CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, WikIArticlesParams,
-    Wiki, WikiListItem, WikiType, WikiTypeResponse,
+    CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar, WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse
 };
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, patch, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
+use sqlx::{Error, PgPool};
 use uuid::Uuid;
+
+async fn wiki_article_exists(pool: &PgPool, id: Uuid) -> Result<bool, Error> {
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM wiki_articles WHERE id = $1)")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+    Ok(exists)
+}
 
 #[get("/wiki_articles")]
 pub async fn get_wiki_articles(
@@ -321,5 +330,72 @@ pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>)
             HttpResponse::InternalServerError()
                 .json(serde_json::json!({ "error": "Failed to fetch wiki article." }))
         }
+    }
+}
+
+#[patch("/wiki/{id}/star")]
+pub async fn add_star_to_wiki(
+    req: HttpRequest,
+    path: web::Path<Uuid>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let article_id = path.into_inner();
+
+    let token = match extract_jwt(&req) {
+        Some(t) => t,
+        None => {
+            return HttpResponse::Unauthorized().json(
+                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
+            );
+        }
+    };
+    let author_id = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims.sub,
+        Err(e) => {
+            eprintln!("JWT decode error: {}", e);
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({ "error": "Invalid or expired token" }));
+        }
+    };
+
+    match wiki_article_exists(&state.pool, article_id).await {
+        Ok(true) => {
+            let wiki_article_create_result = sqlx::query_as::<_, CreateWikiStar>(
+                r#"
+                INSERT INTO wiki_stars (wiki_id, user_id)
+                VALUES ($1, $2)
+                RETURNING
+                    id,
+                    wiki_id,
+                    user_id,
+                    created_at,
+                    updated_at
+                "#,
+            )
+            .bind(article_id)
+            .bind(author_id)
+            .fetch_one(&state.pool)
+            .await;
+
+            match wiki_article_create_result {
+                Ok(article) => {
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "status": "success",
+                    }))
+                }
+                Err(e) => {
+                    eprintln!("Database error: {}", e);
+                    HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": "Failed to add star to wiki article." }))
+                }
+            }
+        }
+        Ok(false) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({ "error": "Wiki article now found" })),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
