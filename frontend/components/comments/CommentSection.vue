@@ -1,5 +1,5 @@
 <template>
-    <div class="comment-section">
+    <div class="comment-section" id="comments">
         <h3 class="comment-section__title">Комментарии</h3>
         
         <div class="comment-section__form" v-if="currentUserId">

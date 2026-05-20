@@ -2,15 +2,28 @@
     <div class="article" @click="navigateToArticle">
         <div class="article__top">
             <NuxtLink :to="`/wiki/${data.id}`" class="article__link" @click.stop>{{ data.title }}</NuxtLink>
-            <UButton 
-                :icon="isStarred ? 'line-md:star-filled' : 'line-md:star'" 
-                size="xs" 
-                :color="isStarred ? 'primary' : 'neutral'" 
-                variant="ghost"
-                @click.stop.prevent="toggleStar"
-            >
-                {{ Number(starsCount) || 0 }}
-            </UButton>
+            <div class="article__stats">
+                <UButton 
+                    :icon="isStarred ? 'line-md:star-filled' : 'line-md:star'" 
+                    size="xs" 
+                    :color="isStarred ? 'primary' : 'neutral'" 
+                    variant="ghost"
+                    @click.stop.prevent="toggleStar"
+                >
+                    {{ Number(starsCount) || 0 }}
+                </UButton>
+                <UButton 
+                    icon="iconamoon:comment-fill" 
+                    size="xs" 
+                    color="neutral" 
+                    variant="ghost"
+                    @click.stop.prevent="navigateToComments"
+
+                >
+                    {{ data.comment_count || 0 }}
+
+                </UButton>
+            </div>
         </div>
         <div class="article__info">
             <div class="user-wrapper">
@@ -59,6 +72,10 @@ watch(() => props.data, (newVal) => {
 
 const navigateToArticle = () => {
     navigateTo(`/wiki/${props.data.id}`);
+};
+
+const navigateToComments = () => {
+    navigateTo(`/wiki/${props.data.id}#comments`);
 };
 
 const toggleStar = async () => {
@@ -110,9 +127,15 @@ const toggleStar = async () => {
 
     &__top {
         display: flex;
-        align-items: flex-start;
         justify-content: space-between;
-        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+
+    &__stats {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
     }
 
     &__link {

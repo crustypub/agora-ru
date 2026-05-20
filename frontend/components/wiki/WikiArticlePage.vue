@@ -25,6 +25,8 @@ const articleIdStr = computed(() => {
 });
 
 const { data: response } = await useApi<IWikiArticleResponse>(`/api/wiki/${articleIdStr.value}`);
+
+
 </script>
 
 <style lang="scss" scoped>

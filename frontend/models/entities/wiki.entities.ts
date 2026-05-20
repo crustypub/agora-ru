@@ -18,6 +18,7 @@ export interface IWikiArticle {
   updated_at: number;
   wiki_type: IWikiType;
   stars_count: number;
+  comment_count: number;
   is_starred: boolean;
 }
 
