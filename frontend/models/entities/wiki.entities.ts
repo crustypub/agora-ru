@@ -18,6 +18,7 @@ export interface IWikiArticle {
   updated_at: number;
   wiki_type: IWikiType;
   stars_count: number;
+  is_starred: boolean;
 }
 
 export type IWikiArticleSimple = Omit<IWikiArticle, "content">;

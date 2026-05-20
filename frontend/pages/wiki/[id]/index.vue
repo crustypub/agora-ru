@@ -6,7 +6,6 @@
 
 <script setup lang="ts">
 import WikiArticlePage from '~/components/wiki/WikiArticlePage.vue';
-import WikiTypesPage from '~/components/wiki/WikiTypesPage.vue';
 
 const route = useRoute()
 const id = route.params.id

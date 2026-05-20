@@ -1,9 +1,16 @@
 <template>
-    <NuxtLink class="article" :to="`wiki/${data.id}`">
+    <div class="article" @click="navigateToArticle">
         <div class="article__top">
-            <span class="article__link">{{ data.title }}</span>
-            <UButton icon="line-md:star" size="xs" color="neutral" variant="ghost">{{
-                Number(data.stars_count) || 0 }}</UButton>
+            <NuxtLink :to="`/wiki/${data.id}`" class="article__link" @click.stop>{{ data.title }}</NuxtLink>
+            <UButton 
+                :icon="isStarred ? 'line-md:star-filled' : 'line-md:star'" 
+                size="xs" 
+                :color="isStarred ? 'primary' : 'neutral'" 
+                variant="ghost"
+                @click.stop.prevent="toggleStar"
+            >
+                {{ Number(starsCount) || 0 }}
+            </UButton>
         </div>
         <div class="article__info">
             <div class="user-wrapper">
@@ -28,18 +35,51 @@
                 <UIcon name="material-symbols:info" class="text-error-500 size-5" />
             </UTooltip>
         </div>
-    </NuxtLink>
+    </div>
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import type { IWikiArticleSimple } from '~/models/entities/wiki.entities';
+import { useApiCall } from '~/composables/useApi';
 
 interface IProps {
     data: IWikiArticleSimple
 }
 
+const props = defineProps<IProps>();
 
-const { data } = defineProps<IProps>();
+const isStarred = ref(props.data.is_starred);
+const starsCount = ref(props.data.stars_count);
+
+watch(() => props.data, (newVal) => {
+    isStarred.value = newVal.is_starred;
+    starsCount.value = newVal.stars_count;
+}, { deep: true });
+
+const navigateToArticle = () => {
+    navigateTo(`/wiki/${props.data.id}`);
+};
+
+const toggleStar = async () => {
+    const previousIsStarred = isStarred.value;
+    const previousStarsCount = starsCount.value;
+
+    isStarred.value = !previousIsStarred;
+    starsCount.value = previousIsStarred ? previousStarsCount - 1 : previousStarsCount + 1;
+
+    try {
+        if (previousIsStarred) {
+            await useApiCall(`/api/wiki/${props.data.id}/star`, { method: 'DELETE' });
+        } else {
+            await useApiCall(`/api/wiki/${props.data.id}/star`, { method: 'PATCH' });
+        }
+    } catch (e) {
+        isStarred.value = previousIsStarred;
+        starsCount.value = previousStarsCount;
+        console.error('Failed to toggle star:', e);
+    }
+};
 
 </script>
 
@@ -57,6 +97,7 @@ const { data } = defineProps<IProps>();
     color: inherit;
     transition: all 0.2s ease-in-out;
     box-shadow: 0 2px 4px rgba($black, 0.02);
+    cursor: pointer;
 
     &:hover {
         box-shadow: 0 6px 12px rgba($black, 0.08);
