@@ -4,7 +4,7 @@ use crate::models::app::AppState;
 use crate::models::wiki::{
     CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar, WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse
 };
-use actix_web::{get, patch, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use sqlx::{Error, PgPool};
 use uuid::Uuid;
@@ -422,8 +422,69 @@ pub async fn add_star_to_wiki(
                 }
             }
         }
-        Ok(false) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({ "error": "Wiki article now found" })),
+        Ok(false) => HttpResponse::NotFound()
+            .json(serde_json::json!({ "error": "Wiki article not found" })),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+#[delete("/wiki/{id}/star")]
+pub async fn remove_star_from_wiki(
+    req: HttpRequest,
+    path: web::Path<Uuid>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let article_id = path.into_inner();
+
+    let token = match extract_jwt(&req) {
+        Some(t) => t,
+        None => {
+            return HttpResponse::Unauthorized().json(
+                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
+            );
+        }
+    };
+    let author_id = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims.sub,
+        Err(e) => {
+            eprintln!("JWT decode error: {}", e);
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({ "error": "Invalid or expired token" }));
+        }
+    };
+
+    match wiki_article_exists(&state.pool, article_id).await {
+        Ok(true) => {
+            let delete_result = sqlx::query(
+                r#"
+                DELETE FROM wiki_stars
+                WHERE wiki_id = $1 AND user_id = $2
+                "#,
+            )
+            .bind(article_id)
+            .bind(author_id)
+            .execute(&state.pool)
+            .await;
+
+            match delete_result {
+                Ok(_) => {
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "status": "success",
+                    }))
+                }
+                Err(e) => {
+                    eprintln!("Database error: {}", e);
+                    HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": "Failed to remove star from wiki article." }))
+                }
+            }
+        }
+        Ok(false) => HttpResponse::NotFound()
+            .json(serde_json::json!({ "error": "Wiki article not found" })),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }

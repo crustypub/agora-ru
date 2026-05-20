@@ -14,7 +14,7 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::handlers::wiki::{add_star_to_wiki, get_wiki_articles};
+use crate::handlers::wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -60,6 +60,7 @@ async fn main() -> std::io::Result<()> {
                 .service(get_wiki_article)
                 .service(get_wiki_articles)
                 .service(add_star_to_wiki)
+                .service(remove_star_from_wiki)
         )
     })
     .bind(("0.0.0.0", 6080))?
