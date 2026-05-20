@@ -67,6 +67,7 @@ pub struct Wiki {
     pub created_at: i64,
     pub updated_at: i64,
     pub stars_count: i32,
+    pub is_starred: bool,
 }
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct WikiListItem {
@@ -79,6 +80,7 @@ pub struct WikiListItem {
     pub created_at: i64,
     pub updated_at: i64,
     pub stars_count: i32,
+    pub is_starred: bool,
 }
 
 #[derive(Deserialize)]

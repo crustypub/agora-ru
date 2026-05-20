@@ -20,13 +20,24 @@ async fn wiki_article_exists(pool: &PgPool, id: Uuid) -> Result<bool, Error> {
 
 #[get("/wiki_articles")]
 pub async fn get_wiki_articles(
-    _req: HttpRequest,
+    req: HttpRequest,
     params: web::Query<WikIArticlesParams>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let limit = params.limit;
     let offset = params.offset();
     let wiki_type_filter = params.wiki_type;
+
+    let current_user_id = extract_jwt(&req)
+        .and_then(|token| {
+            decode::<Claims>(
+                &token,
+                &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+                &Validation::default(),
+            )
+            .ok()
+        })
+        .map(|data| data.claims.sub);
 
     let articles_result = sqlx::query_as::<_, WikiListItem>(
         r#"
@@ -39,6 +50,7 @@ pub async fn get_wiki_articles(
             wa.stars_count,
             wa.created_at,
             wa.updated_at,
+            EXISTS(SELECT 1 FROM wiki_stars ws WHERE ws.wiki_id = wa.id AND ws.user_id = $4) AS is_starred,
             json_build_object(
                 'id',         u1.id,
                 'username',   u1.username,
@@ -71,6 +83,7 @@ pub async fn get_wiki_articles(
     .bind(wiki_type_filter)
     .bind(limit)
     .bind(offset)
+    .bind(current_user_id)
     .fetch_all(&state.pool)
     .await;
 
@@ -95,6 +108,7 @@ pub async fn get_wiki_articles(
                     last_edited_by: row.last_edited_by,
                     is_confirmed: row.is_confirmed,
                     stars_count: row.stars_count,
+                    is_starred: row.is_starred,
                     created_at: row.created_at,
                     updated_at: row.updated_at,
                 })
@@ -258,8 +272,19 @@ pub async fn create_wiki_article(
 }
 
 #[get("/wiki/{id}")]
-pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>) -> impl Responder {
+pub async fn get_wiki_article(req: HttpRequest, path: web::Path<Uuid>, state: web::Data<AppState>) -> impl Responder {
     let article_id = path.into_inner();
+
+    let current_user_id = extract_jwt(&req)
+        .and_then(|token| {
+            decode::<Claims>(
+                &token,
+                &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+                &Validation::default(),
+            )
+            .ok()
+        })
+        .map(|data| data.claims.sub);
 
     let wiki_article = sqlx::query_as::<_, Wiki>(
         r#"
@@ -272,6 +297,7 @@ pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>)
             wa.stars_count,
             wa.created_at,
             wa.updated_at,
+            EXISTS(SELECT 1 FROM wiki_stars ws WHERE ws.wiki_id = wa.id AND ws.user_id = $2) AS is_starred,
             json_build_object(
                 'id', cu.id,
                 'username', cu.username,
@@ -300,6 +326,7 @@ pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>)
         "#,
     )
     .bind(article_id)
+    .bind(current_user_id)
     .fetch_optional(&state.pool)
     .await;
 
@@ -314,6 +341,7 @@ pub async fn get_wiki_article(path: web::Path<Uuid>, state: web::Data<AppState>)
                 last_edited_by: article.last_edited_by,
                 is_confirmed: article.is_confirmed,
                 stars_count: article.stars_count,
+                is_starred: article.is_starred,
                 created_at: article.created_at,
                 updated_at: article.updated_at,
             };
