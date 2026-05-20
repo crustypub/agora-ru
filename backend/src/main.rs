@@ -8,7 +8,7 @@ mod models;
 
 use db::setup::setup_db;
 use handlers::{
-    auth::telegram_auth,
+    auth::{telegram_auth, auth_me},
     post::{create_post, get_posts, post_rating_update},
     wiki::{create_wiki_article, get_wiki_article, get_wiki_types},
 };
@@ -53,6 +53,7 @@ async fn main() -> std::io::Result<()> {
         App::new().wrap(cors).app_data(app_state.clone()).service(
             web::scope("/api")
                 .service(telegram_auth)
+                .service(auth_me)
                 .service(get_posts)
                 .service(create_post)
                 .service(post_rating_update)

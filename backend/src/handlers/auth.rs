@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use actix_web::cookie::{time, Cookie, SameSite};
-use actix_web::{post, web, HttpResponse, Responder};
-use jsonwebtoken::{encode, EncodingKey, Header};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -92,4 +92,43 @@ pub async fn telegram_auth(
     HttpResponse::Ok()
         .cookie(cookie)
         .json(serde_json::json!({ "status": "success" }))
+}
+
+#[get("/auth/me")]
+pub async fn auth_me(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let token = match crate::helpers::api::extract_jwt(&req) {
+        Some(t) => t,
+        None => return HttpResponse::Unauthorized().finish(),
+    };
+
+    let user_id = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims.sub,
+        Err(_) => return HttpResponse::Unauthorized().finish(),
+    };
+
+    let user = sqlx::query_as::<_, crate::models::app::Author>(
+        "SELECT id, username, first_name, last_name, avatar_url FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await;
+
+    match user {
+        Ok(Some(u)) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": u
+        })),
+        Ok(None) => HttpResponse::NotFound().finish(),
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
 }

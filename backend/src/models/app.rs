@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 pub struct AppState {
@@ -15,7 +15,7 @@ pub fn default_limit() -> i64 {
     10
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Author {
     pub id: Uuid,
     pub username: Option<String>,
