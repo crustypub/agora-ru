@@ -3,7 +3,7 @@ use crate::helpers::api::extract_jwt;
 use crate::models::app::{AppState, SortField};
 use crate::models::wiki::{
     CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar,
-    WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse,
+    UpdateWikiArticleRequest, WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse,
 };
 use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
@@ -522,5 +522,148 @@ pub async fn remove_star_from_wiki(
         Ok(false) => HttpResponse::NotFound()
             .json(serde_json::json!({ "error": "Wiki article not found" })),
         Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+#[patch("/wiki/{id}")]
+pub async fn update_wiki_article(
+    req: HttpRequest,
+    path: web::Path<Uuid>,
+    body: web::Json<UpdateWikiArticleRequest>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let article_id = path.into_inner();
+
+    let token = match extract_jwt(&req) {
+        Some(t) => t,
+        None => return HttpResponse::Unauthorized()
+            .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" })),
+    };
+
+    let author_id = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims.sub,
+        Err(e) => {
+            eprintln!("JWT decode error: {}", e);
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({ "error": "Invalid or expired token" }));
+        }
+    };
+
+    // Атомарная проверка авторства + обновление одним запросом:
+    // если created_by не совпадает — UPDATE затронет 0 строк → 403.
+    let result = sqlx::query_as::<_, Wiki>(
+        r#"
+        UPDATE wiki_articles wa
+        SET
+            title          = COALESCE($3, wa.title),
+            content        = COALESCE($4, wa.content),
+            wiki_type_id   = COALESCE($5, wa.wiki_type_id),
+            last_edited_by = $2,
+            updated_at     = EXTRACT(EPOCH FROM now())::bigint
+        WHERE wa.id = $1 AND wa.created_by = $2
+        RETURNING
+            wa.id,
+            wa.title,
+            wa.content,
+            wa.wiki_type_id,
+            wa.is_confirmed,
+            wa.comment_count,
+            wa.stars_count,
+            wa.created_at,
+            wa.updated_at,
+            FALSE AS is_starred,
+            (SELECT json_build_object(
+                'id', u.id, 'username', u.username,
+                'first_name', u.first_name, 'last_name', u.last_name,
+                'avatar_url', u.avatar_url
+            ) FROM users u WHERE u.id = wa.created_by) AS created_by,
+            (SELECT json_build_object(
+                'id', u.id, 'username', u.username,
+                'first_name', u.first_name, 'last_name', u.last_name,
+                'avatar_url', u.avatar_url
+            ) FROM users u WHERE u.id = wa.last_edited_by) AS last_edited_by,
+            (SELECT json_build_object(
+                'id', wt.id, 'title', wt.title,
+                'created_at', wt.created_at, 'updated_at', wt.updated_at
+            ) FROM wiki_types wt WHERE wt.id = wa.wiki_type_id) AS wiki_type
+        "#,
+    )
+    .bind(article_id)
+    .bind(author_id)
+    .bind(&body.title)
+    .bind(&body.content)
+    .bind(body.wiki_type_id)
+    .fetch_optional(&state.pool)
+    .await;
+
+    match result {
+        Ok(Some(article)) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": article,
+        })),
+        Ok(None) => HttpResponse::Forbidden().json(
+            serde_json::json!({ "error": "Article not found or you are not the author" })
+        ),
+        Err(e) => {
+            eprintln!("DB error updating wiki article: {}", e);
+            HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": "Failed to update wiki article" }))
+        }
+    }
+}
+
+#[delete("/wiki/{id}")]
+pub async fn delete_wiki_article(
+    req: HttpRequest,
+    path: web::Path<Uuid>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let article_id = path.into_inner();
+
+    let token = match extract_jwt(&req) {
+        Some(t) => t,
+        None => return HttpResponse::Unauthorized()
+            .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" })),
+    };
+
+    let author_id = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims.sub,
+        Err(e) => {
+            eprintln!("JWT decode error: {}", e);
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({ "error": "Invalid or expired token" }));
+        }
+    };
+
+    // Атомарно: удаляем только если created_by совпадает.
+    // rows_affected == 0 → не найдено или не автор → 403.
+    let result = sqlx::query(
+        "DELETE FROM wiki_articles WHERE id = $1 AND created_by = $2",
+    )
+    .bind(article_id)
+    .bind(author_id)
+    .execute(&state.pool)
+    .await;
+
+    match result {
+        Ok(res) if res.rows_affected() > 0 => {
+            HttpResponse::Ok().json(serde_json::json!({ "status": "success" }))
+        }
+        Ok(_) => HttpResponse::Forbidden().json(
+            serde_json::json!({ "error": "Article not found or you are not the author" })
+        ),
+        Err(e) => {
+            eprintln!("DB error deleting wiki article: {}", e);
+            HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": "Failed to delete wiki article" }))
+        }
     }
 }

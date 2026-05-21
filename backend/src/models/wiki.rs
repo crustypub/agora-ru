@@ -31,6 +31,17 @@ pub struct CreateWikiArticleRequest {
     pub wiki_type_id: i32,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateWikiArticleRequest {
+    #[validate(length(min = 1, max = 255))]
+    pub title: Option<String>,
+
+    #[validate(length(min = 1, max = 100000))]
+    pub content: Option<String>,
+
+    pub wiki_type_id: Option<i32>,
+}
+
 #[derive(Debug, FromRow, Serialize)]
 pub struct CreateWikiArticle {
     pub id: Uuid,

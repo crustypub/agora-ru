@@ -10,7 +10,7 @@ use db::setup::setup_db;
 use handlers::{
     auth::{telegram_auth, auth_me},
     post::{create_post, get_posts, post_rating_update},
-    wiki::{create_wiki_article, get_wiki_article, get_wiki_types},
+    wiki::{create_wiki_article, get_wiki_article, get_wiki_types, update_wiki_article, delete_wiki_article},
 };
 use models::app::AppState;
 
@@ -63,6 +63,8 @@ async fn main() -> std::io::Result<()> {
                 .service(get_wiki_articles)
                 .service(add_star_to_wiki)
                 .service(remove_star_from_wiki)
+                .service(update_wiki_article)
+                .service(delete_wiki_article)
                 .service(get_comments)
                 .service(create_comment)
                 .service(edit_comment)
