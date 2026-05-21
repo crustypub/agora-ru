@@ -1,5 +1,5 @@
 <template>
-  <WikiArticleCreateModal
+  <WikiArticleModal
     :wiki-types="wiki_types_response?.data"
     v-model="isOpenWikiCreateModal"
     :submit="onArticleCreated"

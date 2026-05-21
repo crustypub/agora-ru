@@ -37,9 +37,10 @@ interface IProps {
   wikiTypes: IWikiType[] | undefined;
   closeModal: () => void;
   submit: () => void;
+  article?: any; // Используем any или IWikiArticle
 }
 
-const { wikiTypes, closeModal, submit} = defineProps<IProps>();
+const { wikiTypes, closeModal, submit, article } = defineProps<IProps>();
 
 
 const schema = z.object({
@@ -51,9 +52,9 @@ const schema = z.object({
 type ArticleFormState = z.output<typeof schema>;
 
 const state = reactive({
-  type: undefined as number | undefined,
-  title: '',
-  content: '',
+  type: article?.wiki_type?.id ?? undefined as number | undefined,
+  title: article?.title ?? '',
+  content: article?.content ?? '',
 });
 
 const typeOptions = computed(() =>
@@ -94,13 +95,21 @@ async function handleSubmit(event: { data: ArticleFormState }) {
       content: event?.data?.content,
       wiki_type_id: event?.data?.type,
     }
-    await useApiCall('/api/wiki', {
-      method: 'POST',
-      body: requestData,
-    })
+    
+    if (article) {
+      await useApiCall(`/api/wiki/${article.id}`, {
+        method: 'PATCH',
+        body: requestData,
+      })
+    } else {
+      await useApiCall('/api/wiki', {
+        method: 'POST',
+        body: requestData,
+      })
+    }
     submit();
   } catch (e) {
-
+    console.error('Failed to submit article:', e);
   }
   finally {
     closeModal();
