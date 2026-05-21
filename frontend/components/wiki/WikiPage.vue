@@ -12,7 +12,7 @@
     </div>
 
     <div class="wiki-container__pagination">
-      <UPagination v-if="!!paginationValue" v-model:page="paginationValue.page" :items-per-page="limit"
+      <UPagination v-if="!!paginationValue" v-model:page="page" :items-per-page="limit"
         :total="paginationValue.total" />
 
     </div>
@@ -32,8 +32,14 @@ interface IProps { }
 const { } = defineProps<IProps>();
 
 const limit = 15;
+const page = ref(1);
 
-const { data: response, refresh } = await useApi<IWikiResponse>("/api/wiki_articles");
+const { data: response, refresh } = await useApi<IWikiResponse>("/api/wiki_articles", {
+  query: computed(() => ({
+    page: page.value,
+    limit,
+  }))
+});
 const { data: wiki_types_response } = await useApi<IWikiResponse>("/api/wiki_types");
 
 const isOpenWikiCreateModal = ref(false);
@@ -41,23 +47,18 @@ const isOpenWikiCreateModal = ref(false);
 const openModal = () => (isOpenWikiCreateModal.value = true);
 
 const wikiArticleSubmit = function() {
-  refresh()
+  page.value = 1;
+  refresh();
 }
 
-const getPaginationValue = function (data: IWikiResponse | undefined) {
-  if (data) {
-    return {
-      page: 1,
-      total: data?.meta?.total_count,
-      items: limit
-    }
-  }
-  return null
-}
-
-
-
-const paginationValue = ref<IPaginationValue | null>(response ? getPaginationValue(response.value) : null)
+const paginationValue = computed<IPaginationValue | null>(() => {
+  if (!response.value?.meta) return null;
+  return {
+    page: page.value,
+    total: response.value.meta.total_count,
+    items: limit,
+  };
+});
 
 </script>
 
