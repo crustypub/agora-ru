@@ -557,39 +557,39 @@ pub async fn update_wiki_article(
     // если created_by не совпадает — UPDATE затронет 0 строк → 403.
     let result = sqlx::query_as::<_, Wiki>(
         r#"
-        UPDATE wiki_articles wa
+        UPDATE wiki_articles
         SET
-            title          = COALESCE($3, wa.title),
-            content        = COALESCE($4, wa.content),
-            wiki_type_id   = COALESCE($5, wa.wiki_type_id),
+            title          = COALESCE($3, title),
+            content        = COALESCE($4, content),
+            wiki_type_id   = COALESCE($5, wiki_type_id),
             last_edited_by = $2,
             updated_at     = EXTRACT(EPOCH FROM now())::bigint
-        WHERE wa.id = $1 AND wa.created_by = $2
+        WHERE id = $1 AND created_by = $2
         RETURNING
-            wa.id,
-            wa.title,
-            wa.content,
-            wa.wiki_type_id,
-            wa.is_confirmed,
-            wa.comment_count,
-            wa.stars_count,
-            wa.created_at,
-            wa.updated_at,
+            id,
+            title,
+            content,
+            wiki_type_id,
+            is_confirmed,
+            comment_count,
+            stars_count,
+            created_at,
+            updated_at,
             FALSE AS is_starred,
             (SELECT json_build_object(
                 'id', u.id, 'username', u.username,
                 'first_name', u.first_name, 'last_name', u.last_name,
                 'avatar_url', u.avatar_url
-            ) FROM users u WHERE u.id = wa.created_by) AS created_by,
+            ) FROM users u WHERE u.id = created_by) AS created_by,
             (SELECT json_build_object(
                 'id', u.id, 'username', u.username,
                 'first_name', u.first_name, 'last_name', u.last_name,
                 'avatar_url', u.avatar_url
-            ) FROM users u WHERE u.id = wa.last_edited_by) AS last_edited_by,
+            ) FROM users u WHERE u.id = last_edited_by) AS last_edited_by,
             (SELECT json_build_object(
                 'id', wt.id, 'title', wt.title,
                 'created_at', wt.created_at, 'updated_at', wt.updated_at
-            ) FROM wiki_types wt WHERE wt.id = wa.wiki_type_id) AS wiki_type
+            ) FROM wiki_types wt WHERE wt.id = wiki_type_id) AS wiki_type
         "#,
     )
     .bind(article_id)
