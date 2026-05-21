@@ -1,8 +1,9 @@
 use crate::handlers::auth::Claims;
 use crate::helpers::api::extract_jwt;
-use crate::models::app::AppState;
+use crate::models::app::{AppState, SortField};
 use crate::models::wiki::{
-    CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar, WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse
+    CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar,
+    WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse,
 };
 use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
@@ -26,7 +27,6 @@ pub async fn get_wiki_articles(
 ) -> impl Responder {
     let limit = params.limit;
     let offset = params.offset();
-    let wiki_type_filter = params.wiki_type;
 
     let current_user_id = extract_jwt(&req)
         .and_then(|token| {
@@ -39,7 +39,14 @@ pub async fn get_wiki_articles(
         })
         .map(|data| data.claims.sub);
 
-    let articles_result = sqlx::query_as::<_, WikiListItem>(
+    // Безопасно: колонка берётся из белого списка трейта SortField, а не из user input
+    let sort_col = params.sort_by.as_sql_column();
+    let sort_dir = params.sort_order.as_sql();
+
+    // -- Основной запрос --------------------------------------------------
+    // Динамическая сортировка через format! безопасна: sort_col и sort_dir
+    // берутся только из &'static str enum-а, никакого user input внутри.
+    let articles_sql = format!(
         r#"
         SELECT
             wa.id,
@@ -51,7 +58,7 @@ pub async fn get_wiki_articles(
             wa.stars_count,
             wa.created_at,
             wa.updated_at,
-            EXISTS(SELECT 1 FROM wiki_stars ws WHERE ws.wiki_id = wa.id AND ws.user_id = $4) AS is_starred,
+            EXISTS(SELECT 1 FROM wiki_stars ws WHERE ws.wiki_id = wa.id AND ws.user_id = $6) AS is_starred,
             json_build_object(
                 'id',         u1.id,
                 'username',   u1.username,
@@ -76,24 +83,49 @@ pub async fn get_wiki_articles(
         JOIN wiki_types  wt ON wa.wiki_type_id  = wt.id
         JOIN users       u1 ON wa.created_by     = u1.id
         JOIN users       u2 ON wa.last_edited_by = u2.id
-        WHERE ($1::int IS NULL OR wa.wiki_type_id = $1)
-        ORDER BY wa.created_at DESC
-        LIMIT $2 OFFSET $3
-        "#,
-    )
-    .bind(wiki_type_filter)
-    .bind(limit)
-    .bind(offset)
-    .bind(current_user_id)
-    .fetch_all(&state.pool)
-    .await;
+        WHERE
+            ($1::int  IS NULL OR wa.wiki_type_id = $1)
+            AND ($2::bool IS NULL OR wa.is_confirmed  = $2)
+            AND ($3::text IS NULL OR (
+                wa.title   ILIKE '%' || $3 || '%'
+                OR wa.content ILIKE '%' || $3 || '%'
+            ))
+        ORDER BY {sort_col} {sort_dir}
+        LIMIT $4 OFFSET $5
+        "#
+    );
 
-    let count_result = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM wiki_articles WHERE ($1::int IS NULL OR wiki_type_id = $1)",
-    )
-    .bind(wiki_type_filter)
-    .fetch_one(&state.pool)
-    .await;
+    // -- Запрос COUNT (те же фильтры) ------------------------------------
+    let count_sql = r#"
+        SELECT COUNT(*)
+        FROM wiki_articles wa
+        WHERE
+            ($1::int  IS NULL OR wa.wiki_type_id = $1)
+            AND ($2::bool IS NULL OR wa.is_confirmed  = $2)
+            AND ($3::text IS NULL OR (
+                wa.title   ILIKE '%' || $3 || '%'
+                OR wa.content ILIKE '%' || $3 || '%'
+            ))
+    "#;
+
+    let search = params.search.as_deref().filter(|s| !s.is_empty()).map(str::to_owned);
+
+    let articles_result = sqlx::query_as::<_, WikiListItem>(&articles_sql)
+        .bind(params.wiki_type)    // $1 — wiki_type
+        .bind(params.is_confirmed) // $2 — is_confirmed
+        .bind(&search)             // $3 — search
+        .bind(limit)               // $4 — limit
+        .bind(offset)              // $5 — offset
+        .bind(current_user_id)     // $6 — current_user_id (для is_starred)
+        .fetch_all(&state.pool)
+        .await;
+
+    let count_result = sqlx::query_scalar::<_, i64>(count_sql)
+        .bind(params.wiki_type)
+        .bind(params.is_confirmed)
+        .bind(&search)
+        .fetch_one(&state.pool)
+        .await;
 
     match (articles_result, count_result) {
         (Ok(rows), Ok(total_count)) => {

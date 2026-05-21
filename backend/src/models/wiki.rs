@@ -1,4 +1,4 @@
-use crate::models::app::{default_limit, default_page, Author};
+use crate::models::app::{default_limit, default_page, Author, SortField, SortOrder};
 use serde::{Deserialize, Serialize};
 use sqlx::{types::Json, FromRow};
 use uuid::Uuid;
@@ -85,11 +85,52 @@ pub struct WikiListItem {
     pub is_starred: bool,
 }
 
+
+/// Поля сортировки для wiki-статей
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum WikiSortField {
+    CreatedAt,
+    UpdatedAt,
+    StarsCount,
+}
+
+impl SortField for WikiSortField {
+    fn as_sql_column(&self) -> &'static str {
+        match self {
+            WikiSortField::CreatedAt => "wa.created_at",
+            WikiSortField::UpdatedAt => "wa.updated_at",
+            WikiSortField::StarsCount => "wa.stars_count",
+        }
+    }
+}
+
+impl Default for WikiSortField {
+    fn default() -> Self {
+        WikiSortField::CreatedAt
+    }
+}
+
 #[derive(Deserialize)]
 pub struct WikIArticlesParams {
     pub author_id: Option<String>,
-    pub search_value: Option<String>,
+
+    /// Фильтр по типу вики
     pub wiki_type: Option<i32>,
+
+    /// Фильтр по статусу подтверждения
+    pub is_confirmed: Option<bool>,
+
+    /// Полнотекстовый поиск по title и content
+    pub search: Option<String>,
+
+    /// Поле сортировки
+    #[serde(default)]
+    pub sort_by: WikiSortField,
+
+    /// Направление сортировки
+    #[serde(default)]
+    pub sort_order: SortOrder,
 
     #[serde(default = "default_page")]
     pub page: i64,
