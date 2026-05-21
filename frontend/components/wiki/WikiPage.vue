@@ -92,8 +92,25 @@ const {
     wiki_type:    undefined as number | undefined,
     is_confirmed: undefined as boolean | undefined,
   },
-  { defaultSortBy: 'created_at', defaultSortOrder: 'desc' }
+  {
+    defaultSortBy: 'created_at',
+    defaultSortOrder: 'desc',
+    syncUrl: true,
+    extraFromUrl: (q) => ({
+      wiki_type:    q.wiki_type    ? Number(q.wiki_type) : undefined,
+      is_confirmed: q.is_confirmed === 'true'  ? true
+                  : q.is_confirmed === 'false' ? false
+                  : undefined,
+    }),
+    extraToUrl: (extra) => {
+      const out: Record<string, string> = {};
+      if (extra.wiki_type    !== undefined) out.wiki_type    = String(extra.wiki_type);
+      if (extra.is_confirmed !== undefined) out.is_confirmed = String(extra.is_confirmed);
+      return out;
+    },
+  }
 );
+
 
 const { data: response, refresh, pending } = await useApi<IWikiResponse>('/api/wiki_articles', {
   query: params,
