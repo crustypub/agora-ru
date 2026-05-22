@@ -5,7 +5,7 @@
     v-model:sort-order="sort_order"
     :sort-options="SORT_OPTIONS"
     :has-active-filters="hasActiveFilters"
-    search-placeholder="Поиск по заголовку и содержанию..."
+    search-placeholder="Поиск..."
     @reset="emit('reset')"
   >
     <template #filters>
