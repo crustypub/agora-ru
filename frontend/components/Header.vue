@@ -49,6 +49,29 @@
             </div>
         </template>
     </UHeader>
+
+    <!-- Мобильный навигационный бар (как в iOS/Android аппах) -->
+    <nav class="mobile-nav">
+        <div class="mobile-nav__bar">
+            <NuxtLink
+                v-for="item in quickItems"
+                :key="item.to"
+                :to="item.to"
+                class="mobile-nav__item"
+                :class="{ 'mobile-nav__item--active': item.active }"
+            >
+                <UIcon :name="item.icon" class="mobile-nav__icon" />
+                <span class="mobile-nav__label">{{ item.label }}</span>
+            </NuxtLink>
+
+            <UDropdownMenu :items="moreItems" :popper="{ placement: 'top-end' }">
+                <button class="mobile-nav__item mobile-nav__item--more">
+                    <UIcon name="material-symbols:more-horiz" class="mobile-nav__icon" />
+                    <span class="mobile-nav__label">Еще</span>
+                </button>
+            </UDropdownMenu>
+        </div>
+    </nav>
 </template>
 
 <script setup lang="ts">
