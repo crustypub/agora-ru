@@ -44,8 +44,8 @@
             <UTooltip text="Статья подтверждена" :delay-duration="0" class="article-status" v-if="!!data.is_confirmed">
                 <UIcon name="material-symbols:check-circle-rounded" class="text-success-500 size-5" />
             </UTooltip>
-            <UTooltip text="Статья не подтверждена" :delay-duration="0" class="article-status" v-else-if="!data.is_confirmed">
-                <UIcon name="material-symbols:info" class="text-error-500 size-5" />
+            <UTooltip text="На проверке" :delay-duration="0" class="article-status" v-else-if="!data.is_confirmed">
+                <UIcon name="material-symbols:info" class="text-warning-500 size-5" />
             </UTooltip>
         </div>
     </div>

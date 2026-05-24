@@ -29,11 +29,11 @@
             {{ response.data.wiki_type.title }}
           </UBadge>
           <div class="wiki-article__status">
-            <span v-if="response.data.is_confirmed" class="status-badge status-badge--confirmed">
+            <span v-if="response.data.is_confirmed" class="status-badge text-success-500 bg-success-500">
               <UIcon name="material-symbols:check-circle-rounded" class="status-badge__icon" />
               Подтверждено
             </span>
-            <span v-else class="status-badge status-badge--pending">
+            <span v-else class="status-badge text-warning-500 bg-warning-50">
               <UIcon name="material-symbols:info-outline-rounded" class="status-badge__icon" />
               На проверке
             </span>
