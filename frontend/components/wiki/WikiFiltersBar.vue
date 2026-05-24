@@ -31,6 +31,7 @@
 <script setup lang="ts">
 import type { SortOrder, ISortOption } from '~/models/common/filters';
 import type { IWikiType } from '~/models/entities/wiki.entities';
+import UiListFiltersBar from '~/components/ui/ListFiltersBar.vue';
 
 interface IProps {
   wikiTypes?: IWikiType[];

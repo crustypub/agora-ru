@@ -1,7 +1,6 @@
 <template>
     <UModal fullscreen :title="article ? 'Редактирование Wiki-статьи' : 'Создание Wiki-статьи'" v-model:open="model">
         <template #body>
-            <Placeholder class="h-48" />
             <MdEditorWrapperClient 
                 :wiki-types="wikiTypes" 
                 :close-modal="closeModal" 

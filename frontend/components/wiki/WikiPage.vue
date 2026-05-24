@@ -76,6 +76,8 @@
 import type { IWikiResponse, IWikiTypesResponse } from '~/models/api/wiki.api';
 import type { IPaginationValue } from '~/models/api/meta.api';
 import WikiArticleListItem from './WikiArticleListItem.vue';
+import WikiArticleListItemSkeleton from './WikiArticleListItemSkeleton.vue';
+import WikiArticleModal from './WikiArticleModal.vue';
 import WikiFiltersBar from './WikiFiltersBar.vue';
 
 const {
