@@ -1,14 +1,13 @@
-use crate::handlers::auth::Claims;
-use crate::helpers::api::extract_jwt;
+use crate::helpers::api::{AuthenticatedUser, MaybeAuthenticatedUser};
 use crate::models::app::{AppState, SortField};
 use crate::models::wiki::{
     CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar,
     UpdateWikiArticleRequest, WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse,
 };
 use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
-use jsonwebtoken::{decode, DecodingKey, Validation};
 use sqlx::{Error, PgPool};
 use uuid::Uuid;
+use validator::Validate;
 
 async fn wiki_article_exists(pool: &PgPool, id: Uuid) -> Result<bool, Error> {
     let exists: bool =
@@ -21,23 +20,14 @@ async fn wiki_article_exists(pool: &PgPool, id: Uuid) -> Result<bool, Error> {
 
 #[get("/wiki_articles")]
 pub async fn get_wiki_articles(
-    req: HttpRequest,
+    user: MaybeAuthenticatedUser,
     params: web::Query<WikIArticlesParams>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let limit = params.limit;
     let offset = params.offset();
 
-    let current_user_id = extract_jwt(&req)
-        .and_then(|token| {
-            decode::<Claims>(
-                &token,
-                &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-                &Validation::default(),
-            )
-            .ok()
-        })
-        .map(|data| data.claims.sub);
+    let current_user_id = user.id;
 
     // Безопасно: колонка берётся из белого списка трейта SortField, а не из user input
     let sort_col = params.sort_by.as_sql_column();
@@ -87,8 +77,8 @@ pub async fn get_wiki_articles(
             ($1::int  IS NULL OR wa.wiki_type_id = $1)
             AND ($2::bool IS NULL OR wa.is_confirmed  = $2)
             AND ($3::text IS NULL OR (
-                wa.title   ILIKE '%' || $3 || '%'
-                OR wa.content ILIKE '%' || $3 || '%'
+                wa.title   ILIKE '%' || $3 || '%' ESCAPE '\'
+                OR wa.content ILIKE '%' || $3 || '%' ESCAPE '\'
             ))
         ORDER BY {sort_col} {sort_dir}
         LIMIT $4 OFFSET $5
@@ -103,12 +93,12 @@ pub async fn get_wiki_articles(
             ($1::int  IS NULL OR wa.wiki_type_id = $1)
             AND ($2::bool IS NULL OR wa.is_confirmed  = $2)
             AND ($3::text IS NULL OR (
-                wa.title   ILIKE '%' || $3 || '%'
-                OR wa.content ILIKE '%' || $3 || '%'
+                wa.title   ILIKE '%' || $3 || '%' ESCAPE '\'
+                OR wa.content ILIKE '%' || $3 || '%' ESCAPE '\'
             ))
     "#;
 
-    let search = params.search.as_deref().filter(|s| !s.is_empty()).map(str::to_owned);
+    let search = params.search.as_deref().filter(|s| !s.is_empty()).map(crate::helpers::api::escape_like_pattern);
 
     let articles_result = sqlx::query_as::<_, WikiListItem>(&articles_sql)
         .bind(params.wiki_type)    // $1 — wiki_type
@@ -216,30 +206,16 @@ pub async fn get_wiki_types(_req: HttpRequest, state: web::Data<AppState>) -> im
 
 #[post("/wiki")]
 pub async fn create_wiki_article(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     params: web::Json<CreateWikiArticleRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
+
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     let wiki_article_create_result = sqlx::query_as::<_, CreateWikiArticle>(
         r#"
@@ -306,19 +282,10 @@ pub async fn create_wiki_article(
 }
 
 #[get("/wiki/{id}")]
-pub async fn get_wiki_article(req: HttpRequest, path: web::Path<Uuid>, state: web::Data<AppState>) -> impl Responder {
+pub async fn get_wiki_article(user: MaybeAuthenticatedUser, path: web::Path<Uuid>, state: web::Data<AppState>) -> impl Responder {
     let article_id = path.into_inner();
 
-    let current_user_id = extract_jwt(&req)
-        .and_then(|token| {
-            decode::<Claims>(
-                &token,
-                &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-                &Validation::default(),
-            )
-            .ok()
-        })
-        .map(|data| data.claims.sub);
+    let current_user_id = user.id;
 
     let wiki_article = sqlx::query_as::<_, Wiki>(
         r#"
@@ -399,32 +366,12 @@ pub async fn get_wiki_article(req: HttpRequest, path: web::Path<Uuid>, state: we
 
 #[patch("/wiki/{id}/star")]
 pub async fn add_star_to_wiki(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     path: web::Path<Uuid>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let article_id = path.into_inner();
-
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
 
     match wiki_article_exists(&state.pool, article_id).await {
         Ok(true) => {
@@ -446,7 +393,7 @@ pub async fn add_star_to_wiki(
             .await;
 
             match wiki_article_create_result {
-                Ok(article) => {
+                Ok(_article) => {
                     HttpResponse::Ok().json(serde_json::json!({
                         "status": "success",
                     }))
@@ -466,32 +413,12 @@ pub async fn add_star_to_wiki(
 
 #[delete("/wiki/{id}/star")]
 pub async fn remove_star_from_wiki(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     path: web::Path<Uuid>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let article_id = path.into_inner();
-
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
 
     match wiki_article_exists(&state.pool, article_id).await {
         Ok(true) => {
@@ -527,31 +454,18 @@ pub async fn remove_star_from_wiki(
 
 #[patch("/wiki/{id}")]
 pub async fn update_wiki_article(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     path: web::Path<Uuid>,
     body: web::Json<UpdateWikiArticleRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let article_id = path.into_inner();
+    let author_id = user.id;
 
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => return HttpResponse::Unauthorized()
-            .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" })),
-    };
-
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    if let Err(errors) = body.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     // Атомарная проверка авторства + обновление одним запросом:
     // если created_by не совпадает — UPDATE затронет 0 строк → 403.
@@ -618,30 +532,12 @@ pub async fn update_wiki_article(
 
 #[delete("/wiki/{id}")]
 pub async fn delete_wiki_article(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     path: web::Path<Uuid>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let article_id = path.into_inner();
-
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => return HttpResponse::Unauthorized()
-            .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" })),
-    };
-
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
 
     // Атомарно: удаляем только если created_by совпадает.
     // rows_affected == 0 → не найдено или не автор → 403.

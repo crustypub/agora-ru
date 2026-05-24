@@ -1,10 +1,9 @@
-use crate::handlers::auth::Claims;
-use crate::helpers::api::extract_jwt;
+use crate::helpers::api::AuthenticatedUser;
 use crate::models::app::AppState;
 use crate::models::comment::{CommentParams, CommentResponse, CreateCommentRequest, UpdateCommentRequest, Comment};
-use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use uuid::Uuid;
+use validator::Validate;
 
 #[get("/comments")]
 pub async fn get_comments(
@@ -86,30 +85,16 @@ pub async fn get_comments(
 
 #[post("/comments")]
 pub async fn create_comment(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     params: web::Json<CreateCommentRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
+
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     let comment_create_result = sqlx::query_as::<_, Comment>(
         r#"
@@ -142,33 +127,18 @@ pub async fn create_comment(
 
 #[patch("/comments/{id}")]
 pub async fn edit_comment(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     path: web::Path<Uuid>,
     params: web::Json<UpdateCommentRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let comment_id = path.into_inner();
+    let author_id = user.id;
 
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     // Verify ownership
     let ownership_check = sqlx::query_scalar::<_, Uuid>(
@@ -219,32 +189,12 @@ pub async fn edit_comment(
 
 #[delete("/comments/{id}")]
 pub async fn delete_comment(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     path: web::Path<Uuid>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let comment_id = path.into_inner();
-
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
 
     // Verify ownership
     let ownership_check = sqlx::query_scalar::<_, Uuid>(

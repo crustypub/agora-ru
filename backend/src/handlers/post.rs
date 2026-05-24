@@ -1,14 +1,13 @@
-use crate::helpers::api::extract_jwt;
+use crate::helpers::api::{AuthenticatedUser, MaybeAuthenticatedUser};
 use crate::models::app::AppState;
 use crate::models::post::{
     CreatePostResponse, PostParams, PostRatingMode, PostRatingOperationType, PostRatingRequest,
     PostResponse,
 };
-use crate::{handlers::auth::Claims, models::post::CreatePost};
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
-use jsonwebtoken::{decode, DecodingKey, Validation};
-
+use crate::models::post::CreatePost;
+use actix_web::{get, post, web, HttpResponse, Responder};
 use crate::models::post::{CreatePostRequest, Post};
+use validator::Validate;
 
 fn get_posts_anonymous(posts: Vec<Post>, total_count: i64, params: &PostParams) -> HttpResponse {
     let limit = params.limit;
@@ -47,7 +46,7 @@ fn get_posts_anonymous(posts: Vec<Post>, total_count: i64, params: &PostParams) 
 
 #[get("/post")]
 pub async fn get_posts(
-    req: HttpRequest,
+    user: MaybeAuthenticatedUser,
     params: web::Query<PostParams>,
     state: web::Data<AppState>,
 ) -> impl Responder {
@@ -85,24 +84,8 @@ pub async fn get_posts(
     match (posts_result, count_result) {
         (Ok(posts), Ok(total_count)) => {
             let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
-            let token: Option<String> = extract_jwt(&req);
 
-            if let Some(t) = token {
-                // Логика для авторизованного юзера
-                let author_id = match decode::<Claims>(
-                    &t,
-                    &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-                    &Validation::default(),
-                ) {
-                    Ok(data) => data.claims.sub,
-                    Err(e) => {
-                        // get_posts — публичный эндпоинт: протухший/невалидный токен
-                        // не должен блокировать запрос, отдаём как анонимному пользователю.
-                        eprintln!("JWT decode error (treating as anonymous): {}", e);
-                        return get_posts_anonymous(posts, total_count, &params);
-                    }
-                };
-
+            if let Some(author_id) = user.id {
                 let response: Vec<PostResponse> = posts
                     .into_iter()
                     .map(|post| {
@@ -155,31 +138,16 @@ pub async fn get_posts(
 
 #[post("/post")]
 pub async fn create_post(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     params: web::Json<CreatePostRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
+    let author_id = user.id;
 
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     // 3. Создаём пост, подставляя author из токена
     let result = sqlx::query_as::<_, CreatePost>(
@@ -222,8 +190,7 @@ pub async fn create_post(
         Err(e) => {
             eprintln!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to create post",
-                "details": e.to_string()
+                "error": "Failed to create post"
             }))
         }
     }
@@ -231,31 +198,11 @@ pub async fn create_post(
 
 #[post("/post_rating")]
 pub async fn post_rating_update(
-    req: HttpRequest,
+    user: AuthenticatedUser,
     params: web::Json<PostRatingRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match extract_jwt(&req) {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(
-                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
-            );
-        }
-    };
-
-    let author_id = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims.sub,
-        Err(e) => {
-            eprintln!("JWT decode error: {}", e);
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Invalid or expired token" }));
-        }
-    };
+    let author_id = user.id;
 
     match params.operation_type {
         PostRatingOperationType::Add => {
@@ -265,7 +212,7 @@ pub async fn post_rating_update(
                         r#"
                 UPDATE posts
                 SET
-                    rating_plus = array_append(rating_plus, $1),
+                    rating_plus = array_append(array_remove(rating_plus, $1), $1),
                     rating_minus = array_remove(rating_minus, $1)
                 WHERE id = $2
             "#,
@@ -277,14 +224,12 @@ pub async fn post_rating_update(
                     match result {
                         Ok(rows_affected) => {
                             if rows_affected.rows_affected() == 0 {
-                                // Пост не найден
                                 HttpResponse::NotFound().json(serde_json::json!({
                                     "status": "error",
                                     "error": "Post not found",
                                     "post_id": params.post_id.to_string()
                                 }))
                             } else {
-                                // Пост успешно обновлён
                                 HttpResponse::Ok().json(serde_json::json!({
                                     "status": "success",
                                 }))
@@ -293,8 +238,7 @@ pub async fn post_rating_update(
                         Err(e) => {
                             eprintln!("Database error: {}", e);
                             HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post",
-                                "details": e.to_string()
+                                "error": "Failed to update post rating"
                             }))
                         }
                     }
@@ -304,7 +248,7 @@ pub async fn post_rating_update(
                         r#"
                 UPDATE posts
                 SET
-                    rating_minus = array_append(rating_minus, $1),
+                    rating_minus = array_append(array_remove(rating_minus, $1), $1),
                     rating_plus = array_remove(rating_plus, $1)
                 WHERE id = $2
             "#,
@@ -316,14 +260,12 @@ pub async fn post_rating_update(
                     match result {
                         Ok(rows_affected) => {
                             if rows_affected.rows_affected() == 0 {
-                                // Пост не найден
                                 HttpResponse::NotFound().json(serde_json::json!({
                                     "status": "error",
                                     "error": "Post not found",
                                     "post_id": params.post_id.to_string()
                                 }))
                             } else {
-                                // Пост успешно обновлён
                                 HttpResponse::Ok().json(serde_json::json!({
                                     "status": "success",
                                 }))
@@ -332,8 +274,7 @@ pub async fn post_rating_update(
                         Err(e) => {
                             eprintln!("Database error: {}", e);
                             HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post",
-                                "details": e.to_string()
+                                "error": "Failed to update post rating"
                             }))
                         }
                     }
@@ -359,14 +300,12 @@ pub async fn post_rating_update(
                     match result {
                         Ok(rows_affected) => {
                             if rows_affected.rows_affected() == 0 {
-                                // Пост не найден
                                 HttpResponse::NotFound().json(serde_json::json!({
                                     "status": "error",
                                     "error": "Post not found",
                                     "post_id": params.post_id.to_string()
                                 }))
                             } else {
-                                // Пост успешно обновлён
                                 HttpResponse::Ok().json(serde_json::json!({
                                     "status": "success",
                                 }))
@@ -375,8 +314,7 @@ pub async fn post_rating_update(
                         Err(e) => {
                             eprintln!("Database error: {}", e);
                             HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post",
-                                "details": e.to_string()
+                                "error": "Failed to update post rating"
                             }))
                         }
                     }
@@ -397,14 +335,12 @@ pub async fn post_rating_update(
                     match result {
                         Ok(rows_affected) => {
                             if rows_affected.rows_affected() == 0 {
-                                // Пост не найден
                                 HttpResponse::NotFound().json(serde_json::json!({
                                     "status": "error",
                                     "error": "Post not found",
                                     "post_id": params.post_id.to_string()
                                 }))
                             } else {
-                                // Пост успешно обновлён
                                 HttpResponse::Ok().json(serde_json::json!({
                                     "status": "success",
                                 }))
@@ -413,8 +349,7 @@ pub async fn post_rating_update(
                         Err(e) => {
                             eprintln!("Database error: {}", e);
                             HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post",
-                                "details": e.to_string()
+                                "error": "Failed to update post rating"
                             }))
                         }
                     }
