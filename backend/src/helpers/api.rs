@@ -40,3 +40,84 @@ pub fn escape_like_pattern(s: &str) -> String {
      .replace('%', "\\%")
      .replace('_', "\\_")
 }
+
+use actix_web::dev::Payload;
+use actix_web::{FromRequest, error::InternalError, HttpResponse};
+use std::future::{ready, Ready};
+use jsonwebtoken::{decode, DecodingKey, Validation};
+use uuid::Uuid;
+use crate::handlers::auth::Claims;
+use crate::models::app::AppState;
+
+pub struct AuthenticatedUser {
+    pub id: Uuid,
+}
+
+impl FromRequest for AuthenticatedUser {
+    type Error = actix_web::Error;
+    type Future = Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        let token = match extract_jwt(req) {
+            Some(t) => t,
+            None => {
+                return ready(Err(InternalError::from_response(
+                    "Missing token",
+                    HttpResponse::Unauthorized().json(serde_json::json!({ "error": "Missing authentication token" }))
+                ).into()));
+            }
+        };
+
+        let state = match req.app_data::<actix_web::web::Data<AppState>>() {
+            Some(s) => s,
+            None => {
+                return ready(Err(InternalError::from_response(
+                    "AppState not found",
+                    HttpResponse::InternalServerError().json(serde_json::json!({ "error": "Internal server error" }))
+                ).into()));
+            }
+        };
+
+        match decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+            &Validation::default(),
+        ) {
+            Ok(data) => ready(Ok(AuthenticatedUser { id: data.claims.sub })),
+            Err(_) => ready(Err(InternalError::from_response(
+                "Invalid token",
+                HttpResponse::Unauthorized().json(serde_json::json!({ "error": "Invalid or expired token" }))
+            ).into())),
+        }
+    }
+}
+
+pub struct MaybeAuthenticatedUser {
+    pub id: Option<Uuid>,
+}
+
+impl FromRequest for MaybeAuthenticatedUser {
+    type Error = actix_web::Error;
+    type Future = Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        let token = match extract_jwt(req) {
+            Some(t) => t,
+            None => return ready(Ok(MaybeAuthenticatedUser { id: None })),
+        };
+
+        let state = match req.app_data::<actix_web::web::Data<AppState>>() {
+            Some(s) => s,
+            None => return ready(Ok(MaybeAuthenticatedUser { id: None })),
+        };
+
+        match decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+            &Validation::default(),
+        ) {
+            Ok(data) => ready(Ok(MaybeAuthenticatedUser { id: Some(data.claims.sub) })),
+            Err(_) => ready(Ok(MaybeAuthenticatedUser { id: None })),
+        }
+    }
+}
