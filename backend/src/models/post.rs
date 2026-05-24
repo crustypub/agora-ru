@@ -1,34 +1,19 @@
+use crate::models::app::{default_limit, default_page, Author};
 use serde::{Deserialize, Serialize};
 use sqlx::{types::Json, FromRow};
 use uuid::Uuid;
 use validator::Validate;
 
-fn default_page() -> i64 {
-    1
-}
-fn default_limit() -> i64 {
-    10
-}
-#[derive(Debug, Deserialize, Serialize)]  
+#[derive(Debug, Deserialize, Serialize)]
 pub enum PostRatingMode {
     Increment,
-    Decrement
+    Decrement,
 }
 
-#[derive(Debug, Deserialize, Serialize)]  
+#[derive(Debug, Deserialize, Serialize)]
 pub enum PostRatingOperationType {
     Add,
-    Remove
-}
-
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Author {
-    pub id: Uuid,
-    pub username: Option<String>,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub avatar_url: Option<String>,
+    Remove,
 }
 
 #[derive(Debug, FromRow, Serialize)]
@@ -51,7 +36,7 @@ pub struct PostResponse {
     pub title: String,
     pub content: String,
     pub rating_plus: usize,
-    pub rating_minus:usize,
+    pub rating_minus: usize,
     pub comments_count: i32,
     pub created_at: i64,
     pub updated_at: i64,
@@ -80,7 +65,6 @@ pub struct CreatePostResponse {
     pub created_at: i64,
     pub updated_at: i64,
 }
-
 
 #[derive(Deserialize)]
 pub struct PostParams {
@@ -113,5 +97,5 @@ pub struct CreatePostRequest {
 pub struct PostRatingRequest {
     pub post_id: Uuid,
     pub mode: PostRatingMode,
-    pub operation_type: PostRatingOperationType, 
+    pub operation_type: PostRatingOperationType,
 }

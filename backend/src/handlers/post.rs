@@ -1,45 +1,14 @@
+use crate::helpers::api::extract_jwt;
 use crate::models::app::AppState;
 use crate::models::post::{
-    CreatePostResponse, PostParams, PostRatingMode, PostRatingOperationType, PostRatingRequest, PostResponse
+    CreatePostResponse, PostParams, PostRatingMode, PostRatingOperationType, PostRatingRequest,
+    PostResponse,
 };
 use crate::{handlers::auth::Claims, models::post::CreatePost};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 
 use crate::models::post::{CreatePostRequest, Post};
-
-/// Извлекает JWT из запроса.
-/// Порядок приоритета:
-///   1. `Authorization: Bearer <token>` — для API-клиентов (Postman, curl и т.д.)
-///   2. Cookie `auth_token`             — для браузерных запросов (HttpOnly, JS не может читать)
-fn extract_jwt(req: &HttpRequest) -> Option<String> {
-    // 1. Authorization: Bearer <token> (приоритет — не ломает API-клиентов)
-    if let Some(token) = req
-        .headers()
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .map(|t| t.to_string())
-    {
-        return Some(token);
-    }
-
-    // 2. Cookie auth_token (для браузерных SSR/CSR запросов)
-    if let Some(cookie_header) = req.headers().get("cookie") {
-        if let Ok(cookie_str) = cookie_header.to_str() {
-            for part in cookie_str.split(';') {
-                let mut kv = part.trim().splitn(2, '=');
-                if let (Some(key), Some(value)) = (kv.next(), kv.next()) {
-                    if key.trim() == "auth_token" {
-                        return Some(value.trim().to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    None
-}
 
 fn get_posts_anonymous(posts: Vec<Post>, total_count: i64, params: &PostParams) -> HttpResponse {
     let limit = params.limit;
@@ -87,7 +56,7 @@ pub async fn get_posts(
 
     let posts_result = sqlx::query_as::<_, Post>(
         r#"
-        SELECT 
+        SELECT
             p.id, p.title, p.content,
             p.rating_plus, p.rating_minus, p.comments_count,
             p.created_at, p.updated_at,
@@ -193,8 +162,9 @@ pub async fn create_post(
     let token = match extract_jwt(&req) {
         Some(t) => t,
         None => {
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }));
+            return HttpResponse::Unauthorized().json(
+                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
+            );
         }
     };
 
@@ -216,15 +186,15 @@ pub async fn create_post(
         r#"
         INSERT INTO posts (author, title, content)
         VALUES ($1, $2, $3)
-        RETURNING 
-            id, 
-            author, 
-            title, 
-            content, 
-            rating_plus, 
-            rating_minus, 
+        RETURNING
+            id,
+            author,
+            title,
+            content,
+            rating_plus,
+            rating_minus,
             comments_count,
-            created_at, 
+            created_at,
             updated_at
         "#,
     )
@@ -268,8 +238,9 @@ pub async fn post_rating_update(
     let token = match extract_jwt(&req) {
         Some(t) => t,
         None => {
-            return HttpResponse::Unauthorized()
-                .json(serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }));
+            return HttpResponse::Unauthorized().json(
+                serde_json::json!({ "error": "Missing auth_token cookie or Authorization header" }),
+            );
         }
     };
 
@@ -292,8 +263,8 @@ pub async fn post_rating_update(
                 PostRatingMode::Increment => {
                     let result = sqlx::query(
                         r#"
-                UPDATE posts 
-                SET 
+                UPDATE posts
+                SET
                     rating_plus = array_append(rating_plus, $1),
                     rating_minus = array_remove(rating_minus, $1)
                 WHERE id = $2
@@ -331,8 +302,8 @@ pub async fn post_rating_update(
                 PostRatingMode::Decrement => {
                     let result = sqlx::query(
                         r#"
-                UPDATE posts 
-                SET 
+                UPDATE posts
+                SET
                     rating_minus = array_append(rating_minus, $1),
                     rating_plus = array_remove(rating_plus, $1)
                 WHERE id = $2
@@ -374,9 +345,9 @@ pub async fn post_rating_update(
             match params.mode {
                 PostRatingMode::Increment => {
                     let result = sqlx::query(
-                    r#"
-                        UPDATE posts 
-                        SET 
+                        r#"
+                        UPDATE posts
+                        SET
                             rating_plus = array_remove(rating_plus, $1)
                         WHERE id = $2
                     "#,
@@ -412,9 +383,9 @@ pub async fn post_rating_update(
                 }
                 PostRatingMode::Decrement => {
                     let result = sqlx::query(
-                    r#"
-                        UPDATE posts 
-                        SET 
+                        r#"
+                        UPDATE posts
+                        SET
                             rating_minus = array_remove(rating_minus, $1)
                         WHERE id = $2
                     "#,

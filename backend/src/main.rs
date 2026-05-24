@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{http, web, App, HttpServer};
+use actix_web::{App, HttpServer, http, web::{self, service}};
 
 mod db;
 mod handlers;
@@ -8,12 +8,14 @@ mod models;
 
 use db::setup::setup_db;
 use handlers::{
-    auth::telegram_auth,
-    post::{create_post, get_posts},
+    auth::{telegram_auth, auth_me},
+    post::{create_post, get_posts, post_rating_update},
+    wiki::{create_wiki_article, get_wiki_article, get_wiki_types, update_wiki_article, delete_wiki_article},
 };
 use models::app::AppState;
 
-use crate::handlers::post::post_rating_update;
+use crate::handlers::wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki};
+use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get_comments};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -51,9 +53,22 @@ async fn main() -> std::io::Result<()> {
         App::new().wrap(cors).app_data(app_state.clone()).service(
             web::scope("/api")
                 .service(telegram_auth)
+                .service(auth_me)
                 .service(get_posts)
                 .service(create_post)
                 .service(post_rating_update)
+                .service(get_wiki_types)
+                .service(create_wiki_article)
+                .service(get_wiki_article)
+                .service(get_wiki_articles)
+                .service(add_star_to_wiki)
+                .service(remove_star_from_wiki)
+                .service(update_wiki_article)
+                .service(delete_wiki_article)
+                .service(get_comments)
+                .service(create_comment)
+                .service(edit_comment)
+                .service(delete_comment)
         )
     })
     .bind(("0.0.0.0", 6080))?

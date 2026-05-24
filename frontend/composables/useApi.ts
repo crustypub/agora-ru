@@ -1,9 +1,7 @@
-export const useApi = <T>(url: string, options: any = {}) => {
+export const useApi = <T>(url: string | (() => string), options: any = {}) => {
   const { headers: optionHeaders, ...restOptions } = options
 
   return useFetch<T>(url, {
-    // Уникальный ключ с учётом параметров — предотвращает коллизии кеша Nuxt
-    key: `${url}_${JSON.stringify(restOptions)}`,
     credentials: 'include',
     headers: {
       ...useRequestHeaders(['cookie']), // пробрасываем куки при SSR
