@@ -32,3 +32,11 @@ pub fn extract_jwt(req: &HttpRequest) -> Option<String> {
 
     None
 }
+
+/// Экранирует спецсимволы ILIKE-паттерна (`%`, `_`, `\`),
+/// чтобы пользовательский ввод не ломал поисковую логику.
+pub fn escape_like_pattern(s: &str) -> String {
+    s.replace('\\', "\\\\")
+     .replace('%', "\\%")
+     .replace('_', "\\_")
+}

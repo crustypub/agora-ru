@@ -9,6 +9,7 @@ use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Respon
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use sqlx::{Error, PgPool};
 use uuid::Uuid;
+use validator::Validate;
 
 async fn wiki_article_exists(pool: &PgPool, id: Uuid) -> Result<bool, Error> {
     let exists: bool =
@@ -87,8 +88,8 @@ pub async fn get_wiki_articles(
             ($1::int  IS NULL OR wa.wiki_type_id = $1)
             AND ($2::bool IS NULL OR wa.is_confirmed  = $2)
             AND ($3::text IS NULL OR (
-                wa.title   ILIKE '%' || $3 || '%'
-                OR wa.content ILIKE '%' || $3 || '%'
+                wa.title   ILIKE '%' || $3 || '%' ESCAPE '\'
+                OR wa.content ILIKE '%' || $3 || '%' ESCAPE '\'
             ))
         ORDER BY {sort_col} {sort_dir}
         LIMIT $4 OFFSET $5
@@ -103,12 +104,12 @@ pub async fn get_wiki_articles(
             ($1::int  IS NULL OR wa.wiki_type_id = $1)
             AND ($2::bool IS NULL OR wa.is_confirmed  = $2)
             AND ($3::text IS NULL OR (
-                wa.title   ILIKE '%' || $3 || '%'
-                OR wa.content ILIKE '%' || $3 || '%'
+                wa.title   ILIKE '%' || $3 || '%' ESCAPE '\'
+                OR wa.content ILIKE '%' || $3 || '%' ESCAPE '\'
             ))
     "#;
 
-    let search = params.search.as_deref().filter(|s| !s.is_empty()).map(str::to_owned);
+    let search = params.search.as_deref().filter(|s| !s.is_empty()).map(crate::helpers::api::escape_like_pattern);
 
     let articles_result = sqlx::query_as::<_, WikiListItem>(&articles_sql)
         .bind(params.wiki_type)    // $1 — wiki_type
@@ -240,6 +241,11 @@ pub async fn create_wiki_article(
                 .json(serde_json::json!({ "error": "Invalid or expired token" }));
         }
     };
+
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     let wiki_article_create_result = sqlx::query_as::<_, CreateWikiArticle>(
         r#"
@@ -552,6 +558,11 @@ pub async fn update_wiki_article(
                 .json(serde_json::json!({ "error": "Invalid or expired token" }));
         }
     };
+
+    if let Err(errors) = body.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     // Атомарная проверка авторства + обновление одним запросом:
     // если created_by не совпадает — UPDATE затронет 0 строк → 403.

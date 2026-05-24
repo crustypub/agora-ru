@@ -9,6 +9,7 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 
 use crate::models::post::{CreatePostRequest, Post};
+use validator::Validate;
 
 fn get_posts_anonymous(posts: Vec<Post>, total_count: i64, params: &PostParams) -> HttpResponse {
     let limit = params.limit;
@@ -180,6 +181,11 @@ pub async fn create_post(
                 .json(serde_json::json!({ "error": "Invalid or expired token" }));
         }
     };
+
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     // 3. Создаём пост, подставляя author из токена
     let result = sqlx::query_as::<_, CreatePost>(

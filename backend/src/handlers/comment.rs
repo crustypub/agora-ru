@@ -5,6 +5,7 @@ use crate::models::comment::{CommentParams, CommentResponse, CreateCommentReques
 use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use uuid::Uuid;
+use validator::Validate;
 
 #[get("/comments")]
 pub async fn get_comments(
@@ -111,6 +112,11 @@ pub async fn create_comment(
         }
     };
 
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
+
     let comment_create_result = sqlx::query_as::<_, Comment>(
         r#"
         INSERT INTO comments (entity_type, entity_id, author, content)
@@ -169,6 +175,11 @@ pub async fn edit_comment(
                 .json(serde_json::json!({ "error": "Invalid or expired token" }));
         }
     };
+
+    if let Err(errors) = params.validate() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+    }
 
     // Verify ownership
     let ownership_check = sqlx::query_scalar::<_, Uuid>(
