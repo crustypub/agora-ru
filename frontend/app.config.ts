@@ -2,7 +2,7 @@ export default defineAppConfig({
     ui: {
         header: {
             slots: {
-                root: 'bg-primary border-b-0 h-16',
+                root: 'bg-primary border-b-0 h-14 shrink-0',
                 container: 'flex items-center justify-between gap-3 h-full',
                 left: 'lg:flex-1 flex items-center gap-1.5',
                 center: 'hidden lg:flex',
