@@ -14,7 +14,7 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::handlers::wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki};
+use crate::handlers::{user::update_user_info, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki}};
 use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get_comments};
 
 #[actix_web::main]
@@ -69,6 +69,7 @@ async fn main() -> std::io::Result<()> {
                 .service(create_comment)
                 .service(edit_comment)
                 .service(delete_comment)
+                .service(update_user_info)
         )
     })
     .bind(("0.0.0.0", 6080))?
