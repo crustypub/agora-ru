@@ -64,7 +64,7 @@ const moreItems = computed(() => {
     const items = [
         {
             label: 'О проекте',
-            icon: 'ic:outline-info',
+            icon: 'material-symbols:info-outline',
             to: '/about',
         },
     ];

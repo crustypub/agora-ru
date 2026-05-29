@@ -21,7 +21,8 @@
           :tooltip="true"
           :ui="{
             root: 'w-full group/nav-menu',
-            link: 'font-medium text-sm group-data-[collapsed=true]/nav-menu:justify-center'
+            link: 'font-medium text-sm group-data-[collapsed=true]/nav-menu:justify-center group-data-[collapsed=true]/nav-menu:w-8 group-data-[collapsed=true]/nav-menu:h-8 group-data-[collapsed=true]/nav-menu:p-0 group-data-[collapsed=true]/nav-menu:mx-auto group-data-[collapsed=true]/nav-menu:before:inset-0',
+            linkLeadingIcon: 'w-5 h-5 min-w-5 shrink-0'
           }"
         />
 
