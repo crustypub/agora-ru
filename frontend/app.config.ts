@@ -1,5 +1,10 @@
 export default defineAppConfig({
     ui: {
+        colors: {
+            primary: 'greek-blue',
+            secondary: 'greek-olive',
+            neutral: 'zinc',
+        },
         header: {
             slots: {
                 root: 'bg-primary border-b-0 h-14 shrink-0',

@@ -71,38 +71,64 @@
 
 :root {
   --ui-radius: 0;
+
+  /* Primary (Greek Blue) */
+  --ui-color-primary-50: var(--color-greek-blue-50);
+  --ui-color-primary-100: var(--color-greek-blue-100);
+  --ui-color-primary-200: var(--color-greek-blue-200);
+  --ui-color-primary-300: var(--color-greek-blue-300);
+  --ui-color-primary-400: var(--color-greek-blue-400);
+  --ui-color-primary-500: var(--color-greek-blue-500);
+  --ui-color-primary-600: var(--color-greek-blue-600);
+  --ui-color-primary-700: var(--color-greek-blue-700);
+  --ui-color-primary-800: var(--color-greek-blue-800);
+  --ui-color-primary-900: var(--color-greek-blue-900);
+  --ui-color-primary-950: var(--color-greek-blue-950);
+
+  /* Secondary (Greek Olive) */
+  --ui-color-secondary-50: var(--color-greek-olive-50);
+  --ui-color-secondary-100: var(--color-greek-olive-100);
+  --ui-color-secondary-200: var(--color-greek-olive-200);
+  --ui-color-secondary-300: var(--color-greek-olive-300);
+  --ui-color-secondary-400: var(--color-greek-olive-400);
+  --ui-color-secondary-500: var(--color-greek-olive-500);
+  --ui-color-secondary-600: var(--color-greek-olive-600);
+  --ui-color-secondary-700: var(--color-greek-olive-700);
+  --ui-color-secondary-800: var(--color-greek-olive-800);
+  --ui-color-secondary-900: var(--color-greek-olive-900);
+  --ui-color-secondary-950: var(--color-greek-olive-950);
 }
 
 @theme {
-  /* PRIMARY - #0D5EAF */
-  --color-primary-50: #e6f0f9;
-  --color-primary-100: #cce1f3;
-  --color-primary-200: #99c3e7;
-  --color-primary-300: #66a4db;
-  --color-primary-400: #3386cf;
-  --color-primary-500: #0D5EAF;
+  /* GREEK BLUE - #0D5EAF */
+  --color-greek-blue-50: #e6f0f9;
+  --color-greek-blue-100: #cce1f3;
+  --color-greek-blue-200: #99c3e7;
+  --color-greek-blue-300: #66a4db;
+  --color-greek-blue-400: #3386cf;
+  --color-greek-blue-500: #0D5EAF;
   /* основной цвет */
-  --color-primary-600: #0a4b8c;
-  --color-primary-700: #083869;
-  --color-primary-800: #052646;
-  --color-primary-900: #031323;
-  --color-primary-950: #010a14;
-  --color-primary: #0D5EAF;
+  --color-greek-blue-600: #0a4b8c;
+  --color-greek-blue-700: #083869;
+  --color-greek-blue-800: #052646;
+  --color-greek-blue-900: #031323;
+  --color-greek-blue-950: #010a14;
+  --color-greek-blue: #0D5EAF;
 
-  /* SECONDARY - #8A9A5B */
-  --color-secondary-50: #f5f7f0;
-  --color-secondary-100: #ebece0;
-  --color-secondary-200: #d7dac2;
-  --color-secondary-300: #c2c7a3;
-  --color-secondary-400: #aeb57f;
-  --color-secondary-500: #8A9A5B;
-  --color-secondary: #8A9A5B;
+  /* GREEK OLIVE (SECONDARY) - #8A9A5B */
+  --color-greek-olive-50: #f5f7f0;
+  --color-greek-olive-100: #ebece0;
+  --color-greek-olive-200: #d7dac2;
+  --color-greek-olive-300: #c2c7a3;
+  --color-greek-olive-400: #aeb57f;
+  --color-greek-olive-500: #8A9A5B;
+  --color-greek-olive: #8A9A5B;
   /* основной цвет */
-  --color-secondary-600: #6f7b49;
-  --color-secondary-700: #545c37;
-  --color-secondary-800: #393e25;
-  --color-secondary-900: #1e1f12;
-  --color-secondary-950: #0f1009;
+  --color-greek-olive-600: #6f7b49;
+  --color-greek-olive-700: #545c37;
+  --color-greek-olive-800: #393e25;
+  --color-greek-olive-900: #1e1f12;
+  --color-greek-olive-950: #0f1009;
 
   /* SUCCESS (без изменений) */
   --color-success-50: #f0fdf4;
