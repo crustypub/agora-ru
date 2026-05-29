@@ -14,31 +14,41 @@
     </div>
 
     <!-- Загрузка / Ошибка -->
-    <div v-if="!response?.data" class="wiki-article__loading">
+    <UCard v-if="!response?.data">
       <USkeleton class="h-8 w-3/4 mb-4" />
       <USkeleton class="h-4 w-1/2 mb-2" />
       <USkeleton class="h-4 w-1/3 mb-8" />
       <USkeleton class="h-40 w-full" />
-    </div>
+    </UCard>
 
     <template v-else>
       <!-- Шапка статьи -->
-      <header class="wiki-article__header">
-        <div class="wiki-article__meta-top">
-          <UBadge color="primary" variant="subtle" size="md">
-            {{ response.data.wiki_type.title }}
-          </UBadge>
-          <div class="wiki-article__status">
-            <span v-if="response.data.is_confirmed" class="status-badge text-success-500 bg-success-500">
-              <UIcon name="material-symbols:check-circle-rounded" class="status-badge__icon" />
+      <UCard>
+        <template #header>
+          <div class="wiki-article__meta-top">
+            <UBadge color="primary" variant="subtle" size="md">
+              {{ response.data.wiki_type.title }}
+            </UBadge>
+            <UBadge
+              v-if="response.data.is_confirmed"
+              color="success"
+              variant="subtle"
+              size="sm"
+            >
+              <UIcon name="material-symbols:check-circle-rounded" class="size-4" />
               Подтверждено
-            </span>
-            <span v-else class="status-badge text-warning-500 bg-warning-50">
-              <UIcon name="material-symbols:info-outline-rounded" class="status-badge__icon" />
+            </UBadge>
+            <UBadge
+              v-else
+              color="warning"
+              variant="subtle"
+              size="sm"
+            >
+              <UIcon name="material-symbols:info-outline-rounded" class="size-4" />
               На проверке
-            </span>
+            </UBadge>
           </div>
-        </div>
+        </template>
 
         <div class="wiki-article__title-row">
           <h1 class="wiki-article__title">{{ response.data.title }}</h1>
@@ -56,7 +66,7 @@
             </UButton>
             <UButton
               icon="material-symbols:delete-outline-rounded"
-              color="danger"
+              color="error"
               variant="soft"
               size="sm"
               @click="confirmDelete"
@@ -66,51 +76,53 @@
           </div>
         </div>
 
-        <!-- Информация об авторах -->
-        <div class="wiki-article__authors">
-          <div class="author-card">
-            <span class="author-card__label">Автор:</span>
-            <div class="author-card__user">
-              <UAvatar
-                :src="response.data.created_by.avatar_url || ''"
-                :alt="response.data.created_by.first_name || '.'"
-                size="sm"
-              />
-              <div class="author-card__details">
-                <span class="author-card__name">
-                  {{ response.data.created_by.first_name || response.data.created_by.username }}
-                </span>
-                <span class="author-card__date">{{ formatDate(response.data.created_at) }}</span>
+        <template #footer>
+          <!-- Информация об авторах -->
+          <div class="wiki-article__authors">
+            <div class="author-card">
+              <span class="author-card__label">Автор:</span>
+              <div class="author-card__user">
+                <UAvatar
+                  :src="response.data.created_by.avatar_url || ''"
+                  :alt="response.data.created_by.first_name || '.'"
+                  size="sm"
+                />
+                <div class="author-card__details">
+                  <span class="author-card__name">
+                    {{ response.data.created_by.first_name || response.data.created_by.username }}
+                  </span>
+                  <span class="author-card__date">{{ formatDate(response.data.created_at) }}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div 
-            v-if="response.data.last_edited_by && response.data.updated_at !== response.data.created_at" 
-            class="author-card"
-          >
-            <span class="author-card__label">Редактор:</span>
-            <div class="author-card__user">
-              <UAvatar
-                :src="response.data.last_edited_by.avatar_url || ''"
-                :alt="response.data.last_edited_by.first_name || '.'"
-                size="sm"
-              />
-              <div class="author-card__details">
-                <span class="author-card__name">
-                  {{ response.data.last_edited_by.first_name || response.data.last_edited_by.username }}
-                </span>
-                <span class="author-card__date">{{ formatDate(response.data.updated_at) }}</span>
+            <div 
+              v-if="response.data.last_edited_by && response.data.updated_at !== response.data.created_at" 
+              class="author-card"
+            >
+              <span class="author-card__label">Редактор:</span>
+              <div class="author-card__user">
+                <UAvatar
+                  :src="response.data.last_edited_by.avatar_url || ''"
+                  :alt="response.data.last_edited_by.first_name || '.'"
+                  size="sm"
+                />
+                <div class="author-card__details">
+                  <span class="author-card__name">
+                    {{ response.data.last_edited_by.first_name || response.data.last_edited_by.username }}
+                  </span>
+                  <span class="author-card__date">{{ formatDate(response.data.updated_at) }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </template>
+      </UCard>
 
       <!-- Тело статьи -->
-      <article class="wiki-article__content">
+      <UCard>
         <MdPreview editorId="preview-only" :modelValue="response.data.content" language="en-US" />
-      </article>
+      </UCard>
 
       <!-- Комментарии -->
       <section class="wiki-article__comments">
@@ -135,7 +147,7 @@
       <template #footer>
         <div class="delete-confirm-actions">
           <UButton color="neutral" variant="ghost" @click="isDeleteModalOpen = false">Отмена</UButton>
-          <UButton color="danger" @click="handleDeleteSubmit" :loading="isDeleting">Удалить</UButton>
+          <UButton color="error" @click="handleDeleteSubmit" :loading="isDeleting">Удалить</UButton>
         </div>
       </template>
     </UModal>
@@ -232,24 +244,6 @@ const handleDeleteSubmit = async () => {
     align-self: flex-start;
   }
 
-  &__loading {
-    background-color: $bg-primary;
-    border: 1px solid $border-color;
-    border-radius: 12px;
-    padding: 2rem;
-  }
-
-  &__header {
-    background-color: $bg-primary;
-    border: 1px solid $border-color;
-    border-radius: 12px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    box-shadow: 0 2px 8px rgba($black, 0.01);
-  }
-
   &__meta-top {
     display: flex;
     align-items: center;
@@ -271,7 +265,7 @@ const handleDeleteSubmit = async () => {
   &__title {
     font-size: 1.85rem;
     font-weight: 700;
-    color: $text-primary;
+    color: var(--ui-text-highlighted);
     line-height: 1.3;
     margin: 0;
   }
@@ -290,17 +284,6 @@ const handleDeleteSubmit = async () => {
     display: flex;
     flex-wrap: wrap;
     gap: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid $border-color;
-  }
-
-  &__content {
-    background-color: $bg-primary;
-    border: 1px solid $border-color;
-    border-radius: 12px;
-    padding: 1.5rem;
-    min-height: 200px;
-    box-shadow: 0 2px 8px rgba($black, 0.01);
   }
 }
 
@@ -311,7 +294,7 @@ const handleDeleteSubmit = async () => {
 
   &__label {
     font-size: $text-xs;
-    color: $text-muted;
+    color: var(--ui-text-muted);
     text-transform: uppercase;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -331,42 +314,18 @@ const handleDeleteSubmit = async () => {
   &__name {
     font-size: $text-sm;
     font-weight: 600;
-    color: $text-primary;
+    color: var(--ui-text-highlighted);
   }
 
   &__date {
     font-size: $text-xs;
-    color: $text-muted;
-  }
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: $text-xs;
-  font-weight: 600;
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px;
-
-  &--confirmed {
-    color: #10b981;
-    background-color: rgba(#10b981, 0.08);
-  }
-
-  &--pending {
-    color: #f59e0b;
-    background-color: rgba(#f59e0b, 0.08);
-  }
-
-  &__icon {
-    font-size: 1rem;
+    color: var(--ui-text-muted);
   }
 }
 
 .delete-confirm-text {
   font-size: $text-sm;
-  color: $text-secondary;
+  color: var(--ui-text-muted);
 }
 
 .delete-confirm-actions {
@@ -379,11 +338,6 @@ const handleDeleteSubmit = async () => {
 @media (max-width: 768px) {
   .wiki-article-container {
     padding: 1rem 1rem 4rem;
-  }
-  .wiki-article {
-    &__header, &__content {
-      padding: 1rem;
-    }
   }
 }
 </style>

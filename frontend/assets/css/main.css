@@ -69,6 +69,10 @@
   }
 }
 
+:root {
+  --ui-radius: 0;
+}
+
 @theme {
   /* PRIMARY - #0D5EAF */
   --color-primary-50: #e6f0f9;

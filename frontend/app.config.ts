@@ -21,6 +21,17 @@ export default defineAppConfig({
                 right: 'lg:flex-1 flex items-center justify-center lg:justify-end gap-x-1.5 lg:order-3',
             }
         },
+        card: {
+            slots: {
+                root: 'rounded-none',
+                header: 'rounded-none',
+                body: 'rounded-none',
+                footer: 'rounded-none',
+            }
+        },
+        container: {
+            base: 'max-w-[1150px]'
+        },
         button: {
             base: 'cursor-pointer'
         }

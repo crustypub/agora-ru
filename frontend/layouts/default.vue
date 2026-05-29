@@ -3,7 +3,9 @@
     <Header />
 
     <main class="layout-main">
-      <slot />
+      <UContainer class="layout-main__container">
+        <slot />
+      </UContainer>
     </main>
 
     <MobileNav />
@@ -22,16 +24,21 @@
   font-size: $base-font-size;
   font-family: 'IBM Plex Sans', sans-serif;
   overflow: hidden;
-  
+
   .layout-main {
     width: 100%;
     flex: 1 1 auto;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    padding: .5rem 1rem;
-    max-width: 1150px;
-    margin: 0 auto;
+
+    &__container {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      padding-top: .5rem;
+      padding-bottom: .5rem;
+    }
   }
 }
 </style>
