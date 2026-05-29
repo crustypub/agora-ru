@@ -22,74 +22,11 @@
         </template>
 
         <!-- No center navigation menu, links are in the sidebar -->
-
-        <template #right>
-            <div class="header__auth">
-                <template v-if="authUser">
-                    <UDropdownMenu :items="moreItems" :popper="{ placement: 'bottom-end' }">
-                        <UAvatar
-                            :src="authUser.avatar_url || ''"
-                            :alt="authUser.first_name || authUser.username || ''"
-                            class="user-avatar"
-                            size="sm"
-                        />
-                    </UDropdownMenu>
-                </template>
-                <template v-else>
-                    <UButton to="/auth" class="auth-btn" variant="outline" size="sm">
-                        Войти
-                    </UButton>
-                </template>
-            </div>
-        </template>
     </UHeader>
 </template>
 
 <script setup lang="ts">
-import { useAuthUser } from '~/composables/useAuthUser';
-import { computed } from 'vue';
-
 const isSidebarOpen = useState('isSidebarOpen');
-const authUser = useAuthUser();
-
-const handleLogout = () => {
-    const token = useCookie('auth_token');
-    token.value = null;
-    authUser.value = null;
-    navigateTo('/');
-};
-
-// Меню "Еще" для десктопного аватара
-const moreItems = computed(() => {
-    const items = [
-        {
-            label: 'О проекте',
-            icon: 'material-symbols:info-outline',
-            to: '/about',
-        },
-    ];
-
-    if (authUser.value) {
-        items.push({
-            label: `Профиль: ${authUser.value.first_name || authUser.value.username}`,
-            icon: 'material-symbols:account-circle-outline',
-            disabled: true,
-        });
-        items.push({
-            label: 'Выйти',
-            icon: 'material-symbols:logout-rounded',
-            onSelect: () => handleLogout(),
-        });
-    } else {
-        items.push({
-            label: 'Войти',
-            icon: 'material-symbols:login-rounded',
-            to: '/auth',
-        });
-    }
-
-    return [items];
-});
 </script>
 
 <style lang="scss" scoped>
@@ -105,33 +42,6 @@ const moreItems = computed(() => {
     font-size: $text-2xl;
     font-family: 'Caesar Dressing', sans-serif;
     color: $white;
-}
-
-// Кнопка авторизации — белый outline на тёмном фоне
-.auth-btn {
-    --ui-border: rgba(255, 255, 255, 0.35);
-    --ui-text: rgba(255, 255, 255, 0.85);
-
-    &:hover {
-        --ui-border: rgba(255, 255, 255, 0.7);
-        --ui-text: #fff;
-        --ui-bg: rgba(255, 255, 255, 0.08);
-    }
-}
-
-.user-avatar {
-    cursor: pointer;
-    opacity: 0.9;
-    transition: opacity 0.2s ease;
-
-    &:hover {
-        opacity: 1;
-    }
-}
-
-.header__auth {
-    display: flex;
-    align-items: center;
 }
 
 .sidebar-toggle-btn {

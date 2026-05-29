@@ -26,30 +26,41 @@
           }"
         />
 
-        <template #footer v-if="authUser">
-          <div class="flex items-center gap-2 px-2 py-1.5 w-full overflow-hidden sidebar-footer-inner">
-            <UAvatar
-              :src="authUser.avatar_url || ''"
-              :alt="authUser.first_name || authUser.username || ''"
-              size="sm"
-              class="shrink-0"
-            />
-            <div class="flex flex-col min-w-0 sidebar-user-info">
-              <span class="text-xs font-semibold truncate text-[var(--ui-text-highlighted)]">
-                {{ authUser.first_name || authUser.username }}
-              </span>
-              <span class="text-[10px] truncate text-[var(--ui-text-muted)]">
-                @{{ authUser.username }}
-              </span>
-            </div>
+        <template #footer>
+          <div v-if="authUser" class="w-full">
+            <UDropdownMenu :items="sidebarUserItems" :popper="{ placement: 'right-end' }" class="w-full">
+              <button class="flex items-center gap-2 px-2 py-1.5 w-full overflow-hidden sidebar-footer-inner text-left hover:bg-[var(--ui-bg-hovered)] transition-colors duration-200 cursor-pointer border-0 bg-transparent rounded-none outline-none">
+                <UAvatar
+                  :src="authUser.avatar_url || ''"
+                  :alt="authUser.first_name || authUser.username || ''"
+                  size="sm"
+                  class="shrink-0"
+                />
+                <div class="flex flex-col min-w-0 sidebar-user-info">
+                  <span class="text-xs font-semibold truncate text-[var(--ui-text-highlighted)]">
+                    {{ authUser.first_name || authUser.username }}
+                  </span>
+                  <span class="text-[10px] truncate text-[var(--ui-text-muted)]">
+                    @{{ authUser.username }}
+                  </span>
+                </div>
+                <UIcon
+                  name="material-symbols:more-vert"
+                  class="ml-auto shrink-0 sidebar-more-icon text-[var(--ui-text-muted)] w-4 h-4"
+                />
+              </button>
+            </UDropdownMenu>
+          </div>
+          <div v-else class="w-full px-2 py-1.5">
             <UButton
-              icon="material-symbols:logout-rounded"
+              to="/auth"
+              icon="material-symbols:login-rounded"
               variant="ghost"
-              color="red"
-              size="xs"
-              class="ml-auto shrink-0 sidebar-logout-btn"
-              @click="handleLogout"
-            />
+              class="w-full flex items-center gap-2 sidebar-login-btn text-[var(--ui-text-muted)] hover:text-[var(--ui-text-highlighted)] hover:bg-[var(--ui-bg-hovered)]"
+              :class="{ 'justify-center px-0': !isSidebarOpen, 'justify-start': isSidebarOpen }"
+            >
+              <span v-if="isSidebarOpen" class="text-xs font-semibold">Войти</span>
+            </UButton>
           </div>
         </template>
       </USidebar>
@@ -67,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useNavigation } from '~/composables/useNavigation';
 import { useAuthUser } from '~/composables/useAuthUser';
 
@@ -80,6 +92,25 @@ const handleLogout = () => {
     authUser.value = null;
     navigateTo('/');
 };
+
+const sidebarUserItems = computed(() => {
+    const items = [];
+
+    if (authUser.value) {
+        items.push({
+            label: `Профиль: ${authUser.value.first_name || authUser.value.username}`,
+            icon: 'material-symbols:account-circle-outline',
+            disabled: true,
+        });
+        items.push({
+            label: 'Выйти',
+            icon: 'material-symbols:logout-rounded',
+            onSelect: () => handleLogout(),
+        });
+    }
+
+    return [items];
+});
 </script>
 
 <style scoped lang="scss">
@@ -138,7 +169,7 @@ const handleLogout = () => {
   // Centering avatar and hiding texts/buttons when sidebar is collapsed in icon mode
   :deep([data-state="collapsed"]) {
     .sidebar-user-info,
-    .sidebar-logout-btn {
+    .sidebar-more-icon {
       display: none !important;
     }
 
