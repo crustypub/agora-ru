@@ -2,27 +2,31 @@
     <div class="comment-section" id="comments">
         <h3 class="comment-section__title">Комментарии</h3>
         
-        <div class="comment-section__form" v-if="currentUserId">
-            <UTextarea 
-                v-model="newCommentText" 
-                placeholder="Написать комментарий..." 
-                autoresize
-                :disabled="isSubmitting"
-            />
-            <div class="comment-section__form-actions">
-                <UButton 
-                    color="primary" 
-                    @click="submitComment" 
-                    :loading="isSubmitting"
-                    :disabled="!newCommentText.trim()"
-                >
-                    Отправить
-                </UButton>
+        <UCard v-if="currentUserId" class="comment-section__form-card">
+            <div class="comment-section__form">
+                <UTextarea 
+                    v-model="newCommentText" 
+                    placeholder="Написать комментарий..." 
+                    autoresize
+                    :disabled="isSubmitting"
+                />
+                <div class="comment-section__form-actions">
+                    <UButton 
+                        color="primary" 
+                        @click="submitComment" 
+                        :loading="isSubmitting"
+                        :disabled="!newCommentText.trim()"
+                    >
+                        Отправить
+                    </UButton>
+                </div>
             </div>
-        </div>
-        <div v-else class="comment-section__auth-prompt">
-            Войдите, чтобы оставить комментарий.
-        </div>
+        </UCard>
+        <UCard v-else>
+            <p class="comment-section__auth-prompt">
+                Войдите, чтобы оставить комментарий.
+            </p>
+        </UCard>
 
         <div class="comment-section__list">
             <CommentItem 
@@ -38,15 +42,14 @@
             </div>
         </div>
         
-        <UModal v-model:open="isDeleteModalOpen">
-            <template #content>
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold mb-2">Удаление комментария</h3>
-                    <p class="text-sm text-gray-500 mb-6">Вы уверены, что хотите удалить этот комментарий? Это действие нельзя отменить.</p>
-                    <div class="flex justify-end gap-3">
-                        <UButton color="gray" variant="soft" @click="isDeleteModalOpen = false">Отмена</UButton>
-                        <UButton color="red" @click="confirmDelete" :loading="isDeleting">Удалить</UButton>
-                    </div>
+        <UModal v-model:open="isDeleteModalOpen" title="Удаление комментария">
+            <template #body>
+                <p class="delete-confirm-text">Вы уверены, что хотите удалить этот комментарий? Это действие нельзя отменить.</p>
+            </template>
+            <template #footer>
+                <div class="delete-confirm-actions">
+                    <UButton color="neutral" variant="soft" @click="isDeleteModalOpen = false">Отмена</UButton>
+                    <UButton color="error" @click="confirmDelete" :loading="isDeleting">Удалить</UButton>
                 </div>
             </template>
         </UModal>
@@ -174,22 +177,18 @@ const confirmDelete = async () => {
     width: 100%;
     margin-top: 2rem;
     padding-top: 2rem;
-    border-top: 1px solid $border-color;
+    border-top: 1px solid var(--ui-border);
 
     &__title {
         font-size: $text-xl;
         font-weight: 600;
-        color: $text-primary;
+        color: var(--ui-text-highlighted);
     }
 
     &__form {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
-        background-color: $bg-primary;
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid $border-color;
     }
 
     &__form-actions {
@@ -198,12 +197,10 @@ const confirmDelete = async () => {
     }
 
     &__auth-prompt {
-        padding: 1rem;
-        background-color: $bg-secondary;
-        border-radius: 8px;
         text-align: center;
-        color: $text-muted;
+        color: var(--ui-text-muted);
         font-size: $text-sm;
+        margin: 0;
     }
 
     &__list {
@@ -214,9 +211,21 @@ const confirmDelete = async () => {
 
     &__empty {
         text-align: center;
-        color: $text-muted;
+        color: var(--ui-text-muted);
         font-size: $text-sm;
         padding: 2rem 0;
     }
+}
+
+.delete-confirm-text {
+    font-size: $text-sm;
+    color: var(--ui-text-muted);
+}
+
+.delete-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    width: 100%;
 }
 </style>

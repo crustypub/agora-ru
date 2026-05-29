@@ -1,5 +1,5 @@
 <template>
-    <div class="comment-item">
+    <UCard class="comment-item-card">
         <div class="comment-item__header">
             <div class="comment-item__author">
                 <UAvatar :src="comment.author.avatar_url || ''" :alt="comment.author?.first_name || '.'" size="sm" />
@@ -10,7 +10,7 @@
             </div>
 
             <UDropdownMenu v-if="isOwner" :items="dropdownItems" :popper="{ placement: 'bottom-end' }">
-                <UButton color="primary" variant="ghost" icon="i-heroicons-ellipsis-horizontal-20-solid" />
+                <UButton color="neutral" variant="ghost" icon="material-symbols:more-horiz" />
             </UDropdownMenu>
         </div>
 
@@ -24,7 +24,7 @@
         <div v-else class="comment-item__content">
             {{ comment.content }}
         </div>
-    </div>
+    </UCard>
 </template>
 
 <script setup lang="ts">
@@ -56,12 +56,12 @@ const formattedDate = computed(() => {
 const dropdownItems = computed(() => [[
     {
         label: 'Редактировать',
-        icon: 'i-heroicons-pencil-square-20-solid',
+        icon: 'material-symbols:edit-outline-rounded',
         onSelect: () => startEdit()
     },
     {
         label: 'Удалить',
-        icon: 'i-heroicons-trash-20-solid',
+        icon: 'material-symbols:delete-outline-rounded',
         onSelect: () => emit('delete', props.comment.id)
     }
 ]]);
@@ -90,15 +90,15 @@ const saveEdit = async () => {
 </script>
 
 <style lang="scss" scoped>
-.comment-item {
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    background-color: $bg-primary;
-    border: 1px solid $border-color;
-    border-radius: 8px;
-    gap: 0.75rem;
+.comment-item-card {
+    :deep([data-slot="body"]) {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+}
 
+.comment-item {
     &__header {
         display: flex;
         justify-content: space-between;
@@ -119,17 +119,17 @@ const saveEdit = async () => {
     &__name {
         font-weight: 600;
         font-size: $text-sm;
-        color: $text-primary;
+        color: var(--ui-text-highlighted);
     }
 
     &__date {
         font-size: $text-xs;
-        color: $text-muted;
+        color: var(--ui-text-muted);
     }
 
     &__content {
         font-size: $text-sm;
-        color: $text-primary;
+        color: var(--ui-text);
         white-space: pre-wrap;
         word-break: break-word;
     }

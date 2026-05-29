@@ -1,16 +1,17 @@
 <template>
-  <div class="page-container items-center">
-    <div class="auth-wrapper">
-      <span class="auth-wrapper__title">Авторизация на ресурсе доступна исключительно через Telegram</span>
+  <div class="page-container items-center justify-center">
+    <UCard class="auth-card">
+      <template #header>
+        <span class="auth-card__title">Авторизация</span>
+      </template>
+      <p class="auth-card__desc">Авторизация на ресурсе доступна исключительно через Telegram</p>
       <TelegramLoginWidget telegram-login="agoraru_auth_bot" @callback="testCallback" />
-    </div>
+    </UCard>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useApi } from '~/composables/useApi';
-
-
 
 const testCallback = async (user: object) => {
   try {
@@ -26,12 +27,20 @@ const testCallback = async (user: object) => {
 </script>
 
 <style lang="scss" scoped>
-.auth-wrapper {
+.auth-card {
   width: 100%;
   max-width: 740px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: .5rem;
+
+  &__title {
+    font-size: $text-xl;
+    font-weight: 600;
+    color: var(--ui-text-highlighted);
+  }
+
+  &__desc {
+    font-size: $text-sm;
+    color: var(--ui-text-muted);
+    margin-bottom: 1rem;
+  }
 }
 </style>

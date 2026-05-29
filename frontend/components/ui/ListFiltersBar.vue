@@ -1,67 +1,69 @@
 <template>
-  <div class="filters-bar">
-    <div class="filters-bar__left">
-      <UInput
-        v-if="showSearch"
-        v-model="searchModel"
-        :placeholder="searchPlaceholder"
-        size="sm"
-        class="filters-bar__search"
-      >
-        <template #leading>
-          <UIcon name="material-symbols:search-rounded" class="filters-bar__search-icon" />
+  <UCard class="filters-bar-card" :ui="{ body: 'p-3 sm:p-4' }">
+    <div class="filters-bar">
+      <div class="filters-bar__left">
+        <UInput
+          v-if="showSearch"
+          v-model="searchModel"
+          :placeholder="searchPlaceholder"
+          size="sm"
+          class="filters-bar__search"
+        >
+          <template #leading>
+            <UIcon name="material-symbols:search-rounded" class="filters-bar__search-icon" />
+          </template>
+          <template #trailing>
+            <UButton
+              v-if="searchModel"
+              icon="material-symbols:close-rounded"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              aria-label="Очистить поиск"
+              @click="searchModel = ''"
+            />
+          </template>
+        </UInput>
+
+        <template v-if="$slots.filters">
+          <slot name="filters" />
         </template>
-        <template #trailing>
+      </div>
+
+      <div class="filters-bar__right">
+        <div class="filters-bar__sort" v-if="sortOptions.length">
+          <USelect
+            v-model="sortByModel"
+            :items="sortOptions"
+            value-key="value"
+            size="sm"
+            class="filters-bar__sort-select"
+          />
           <UButton
-            v-if="searchModel"
-            icon="material-symbols:close-rounded"
-            size="xs"
+            :icon="sortOrderModel === 'asc'
+              ? 'material-symbols:arrow-upward-rounded'
+              : 'material-symbols:arrow-downward-rounded'"
+            size="sm"
             variant="ghost"
             color="neutral"
-            aria-label="Очистить поиск"
-            @click="searchModel = ''"
+            :aria-label="sortOrderModel === 'asc' ? 'По возрастанию' : 'По убыванию'"
+            @click="toggleSortOrder"
           />
-        </template>
-      </UInput>
+        </div>
 
-      <template v-if="$slots.filters">
-        <slot name="filters" />
-      </template>
-    </div>
-
-    <div class="filters-bar__right">
-      <div class="filters-bar__sort" v-if="sortOptions.length">
-        <USelect
-          v-model="sortByModel"
-          :items="sortOptions"
-          value-key="value"
-          size="sm"
-          class="filters-bar__sort-select"
-        />
         <UButton
-          :icon="sortOrderModel === 'asc'
-            ? 'material-symbols:arrow-upward-rounded'
-            : 'material-symbols:arrow-downward-rounded'"
+          v-if="hasActiveFilters"
+          icon="material-symbols:filter-alt-off-outline-rounded"
           size="sm"
           variant="ghost"
           color="neutral"
-          :aria-label="sortOrderModel === 'asc' ? 'По возрастанию' : 'По убыванию'"
-          @click="toggleSortOrder"
-        />
+          @click="emit('reset')"
+        >
+          Сбросить
+        </UButton>
       </div>
-
-      <UButton
-        v-if="hasActiveFilters"
-        icon="material-symbols:filter-alt-off-outline-rounded"
-        size="sm"
-        variant="ghost"
-        color="neutral"
-        @click="emit('reset')"
-      >
-        Сбросить
-      </UButton>
     </div>
-  </div>
+  </UCard>
 </template>
 
 <script setup lang="ts">
@@ -124,7 +126,7 @@ function toggleSortOrder() {
 
   &__search-icon {
     font-size: 1rem;
-    color: $text-muted;
+    color: var(--ui-text-muted);
   }
 
   &__sort {

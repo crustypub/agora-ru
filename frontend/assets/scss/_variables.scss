@@ -1,4 +1,11 @@
 // ========== ЦВЕТОВАЯ ГАММА ==========
+// ⚠️ DEPRECATED: Предпочитайте CSS-переменные Nuxt UI:
+//   --ui-text, --ui-text-highlighted, --ui-text-muted
+//   --ui-bg, --ui-bg-muted, --ui-bg-elevated
+//   --ui-border, --ui-border-accented
+//   --ui-primary, --ui-color-primary-{50..950}
+// Эти SCSS-переменные сохранены для обратной совместимости.
+//
 // Основные цвета (греческий флаг)
 $blue-primary: #0D5EAF;
 $blue-dark: #084178;

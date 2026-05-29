@@ -8,7 +8,7 @@ export const useNavigation = () => {
         {
             label: 'Главная',
             to: '/',
-            icon: 'ic:outline-house',
+            icon: 'material-symbols:home-outline',
             active: route.path === '/',
         },
         {
@@ -20,13 +20,13 @@ export const useNavigation = () => {
         {
             label: 'Объявления',
             to: '/discussions',
-            icon: 'ic:outline-shopping-basket',
+            icon: 'material-symbols:shopping-basket-outline',
             active: route.path.startsWith('/discussions'),
         },
         {
             label: 'О проекте',
             to: '/about',
-            icon: 'ic:outline-info',
+            icon: 'material-symbols:info-outline',
             active: route.path === '/about',
         },
     ]);
@@ -35,7 +35,7 @@ export const useNavigation = () => {
         {
             label: 'Главная',
             to: '/',
-            icon: 'ic:outline-house',
+            icon: 'material-symbols:home-outline',
             active: route.path === '/',
         },
         {
@@ -47,7 +47,7 @@ export const useNavigation = () => {
         {
             label: 'Объявления',
             to: '/discussions',
-            icon: 'ic:outline-shopping-basket',
+            icon: 'material-symbols:shopping-basket-outline',
             active: route.path.startsWith('/discussions'),
         },
     ]);

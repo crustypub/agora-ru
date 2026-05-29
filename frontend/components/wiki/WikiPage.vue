@@ -47,18 +47,20 @@
     </div>
 
     <!-- Пустое состояние -->
-    <div class="wiki-container__empty" v-else-if="!pending">
-      <UIcon name="material-symbols:article-outline-rounded" class="wiki-container__empty-icon" />
-      <p class="wiki-container__empty-text">Статьи не найдены</p>
-      <UButton
-        v-if="hasActiveFilters"
-        variant="ghost"
-        size="sm"
-        @click="resetFilters"
-      >
-        Сбросить фильтры
-      </UButton>
-    </div>
+    <UCard v-else-if="!pending" class="wiki-container__empty-card">
+      <div class="wiki-container__empty">
+        <UIcon name="material-symbols:article-outline-rounded" class="wiki-container__empty-icon" />
+        <p class="wiki-container__empty-text">Статьи не найдены</p>
+        <UButton
+          v-if="hasActiveFilters"
+          variant="ghost"
+          size="sm"
+          @click="resetFilters"
+        >
+          Сбросить фильтры
+        </UButton>
+      </div>
+    </UCard>
 
     <!-- Пагинация -->
     <div class="wiki-container__pagination">
@@ -179,15 +181,18 @@ function onArticleCreated() {
     row-gap: 1rem;
   }
 
-  &__empty {
+  &__empty-card {
     flex: 1;
+  }
+
+  &__empty {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    padding: 3rem 0;
-    color: $text-muted;
+    padding: 2rem 0;
+    color: var(--ui-text-muted);
   }
 
   &__empty-icon {

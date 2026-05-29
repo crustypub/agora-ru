@@ -1,54 +1,59 @@
 <template>
-    <div class="article" @click="navigateToArticle">
-        <div class="article__top">
-            <NuxtLink :to="`/wiki/${data.id}`" class="article__link" @click.stop>{{ data.title }}</NuxtLink>
-            <div class="article__stats">
-                <UButton 
-                    :icon="isStarred ? 'line-md:star-filled' : 'line-md:star'" 
-                    size="xs" 
-                    :color="isStarred ? 'primary' : 'neutral'" 
-                    variant="ghost"
-                    @click.stop.prevent="toggleStar"
-                >
-                    {{ Number(starsCount) || 0 }}
-                </UButton>
-                <UButton 
-                    icon="iconamoon:comment-fill" 
-                    size="xs" 
-                    color="neutral" 
-                    variant="ghost"
-                    @click.stop.prevent="navigateToComments"
+    <UCard class="article-card" @click="navigateToArticle" :ui="{ root: 'cursor-pointer transition-all duration-200 hover:border-[var(--ui-primary)] hover:shadow-md' }">
+        <template #header>
+            <div class="article-card__top">
+                <NuxtLink :to="`/wiki/${data.id}`" class="article-card__link" @click.stop>{{ data.title }}</NuxtLink>
+                <div class="article-card__stats">
+                    <UButton 
+                        :icon="isStarred ? 'line-md:star-filled' : 'line-md:star'" 
+                        size="xs" 
+                        :color="isStarred ? 'primary' : 'neutral'" 
+                        variant="ghost"
+                        @click.stop.prevent="toggleStar"
+                    >
+                        {{ Number(starsCount) || 0 }}
+                    </UButton>
+                    <UButton 
+                        icon="iconamoon:comment-fill" 
+                        size="xs" 
+                        color="neutral" 
+                        variant="ghost"
+                        @click.stop.prevent="navigateToComments"
+                    >
+                        {{ data.comment_count || 0 }}
+                    </UButton>
+                </div>
+            </div>
+        </template>
 
-                >
-                    {{ data.comment_count || 0 }}
-
-                </UButton>
+        <template #footer>
+            <div class="article-card__info">
+                <div class="user-wrapper">
+                    <span class="user-wrapper__title">Автор: </span>
+                    <UTooltip :text="`${data?.created_by?.first_name}  @${data?.created_by?.username}`" :delay-duration="0">
+                        <UAvatar :src="data.created_by.avatar_url || ''" :alt="data?.created_by?.first_name || '.'"
+                            size="xs" />
+                    </UTooltip>
+                </div>
+                <div class="user-wrapper">
+                    <span class="user-wrapper__title">Последняя редакция: </span>
+                    <UTooltip :text="`${data?.last_edited_by?.first_name}  @${data?.last_edited_by?.username}`"
+                        :delay-duration="0">
+                        <UAvatar :src="data.last_edited_by.avatar_url || ''" :alt="data?.last_edited_by?.first_name || '.'"
+                            size="xs" />
+                    </UTooltip>
+                </div>
+                <UBadge v-if="!!data.is_confirmed" color="success" variant="subtle" size="sm" class="article-status">
+                    <UIcon name="material-symbols:check-circle-rounded" class="size-4" />
+                    Подтверждено
+                </UBadge>
+                <UBadge v-else color="warning" variant="subtle" size="sm" class="article-status">
+                    <UIcon name="material-symbols:info" class="size-4" />
+                    На проверке
+                </UBadge>
             </div>
-        </div>
-        <div class="article__info">
-            <div class="user-wrapper">
-                <span class="user-wrapper__title">Автор: </span>
-                <UTooltip :text="`${data?.created_by?.first_name}  @${data?.created_by?.username}`" :delay-duration="0">
-                    <UAvatar :src="data.created_by.avatar_url || ''" :alt="data?.created_by?.first_name || '.'"
-                        size="xs" />
-                </UTooltip>
-            </div>
-            <div class="user-wrapper">
-                <span class="user-wrapper__title">Последняя редакция: </span>
-                <UTooltip :text="`${data?.last_edited_by?.first_name}  @${data?.last_edited_by?.username}`"
-                    :delay-duration="0">
-                    <UAvatar :src="data.last_edited_by.avatar_url || ''" :alt="data?.last_edited_by?.first_name || '.'"
-                        size="xs" />
-                </UTooltip>
-            </div>
-            <UTooltip text="Статья подтверждена" :delay-duration="0" class="article-status" v-if="!!data.is_confirmed">
-                <UIcon name="material-symbols:check-circle-rounded" class="text-success-500 size-5" />
-            </UTooltip>
-            <UTooltip text="На проверке" :delay-duration="0" class="article-status" v-else-if="!data.is_confirmed">
-                <UIcon name="material-symbols:info" class="text-warning-500 size-5" />
-            </UTooltip>
-        </div>
-    </div>
+        </template>
+    </UCard>
 </template>
 
 <script setup lang="ts">
@@ -101,35 +106,11 @@ const toggleStar = async () => {
 </script>
 
 <style lang="scss" scoped>
-.article {
-    display: flex;
-    flex-direction: column;
-    row-gap: 0.75rem;
-    width: 100%;
-    padding: 1rem 1.25rem;
-    background-color: $bg-primary;
-    border: 1px solid $border-color;
-    border-radius: 8px;
-    text-decoration: none;
-    color: inherit;
-    transition: all 0.2s ease-in-out;
-    box-shadow: 0 2px 4px rgba($black, 0.02);
-    cursor: pointer;
-
-    &:hover {
-        box-shadow: 0 6px 12px rgba($black, 0.08);
-        border-color: $primary;
-
-        .article__link {
-            color: $primary;
-        }
-    }
-
+.article-card {
     &__top {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 12px;
     }
 
     &__stats {
@@ -141,9 +122,13 @@ const toggleStar = async () => {
     &__link {
         font-size: $text-md;
         font-weight: 600;
-        color: $text-primary;
+        color: var(--ui-text-highlighted);
         transition: color 0.2s ease;
         line-height: 1.4;
+
+        &:hover {
+            color: var(--ui-primary);
+        }
     }
 
     &__info {
@@ -151,8 +136,6 @@ const toggleStar = async () => {
         align-items: center;
         flex-wrap: wrap;
         gap: 1.25rem;
-        padding-top: 0.75rem;
-        border-top: 1px solid $gray-200;
 
         .article-status {
             margin-left: auto;
@@ -165,7 +148,7 @@ const toggleStar = async () => {
 
             &__title {
                 font-size: $text-xs;
-                color: $text-muted;
+                color: var(--ui-text-muted);
                 white-space: nowrap;
             }
         }
