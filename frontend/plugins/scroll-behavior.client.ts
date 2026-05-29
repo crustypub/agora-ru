@@ -1,8 +1,10 @@
 export default defineNuxtPlugin((nuxtApp) => {
     nuxtApp.hook('page:finish', () => {
-        const main = document.querySelector('.layout-main');
-        if (main) {
-            main.scrollTop = 0;
-        }
+        const scrollContainers = document.querySelectorAll('.layout-main, .layout-main__container');
+        scrollContainers.forEach((el) => {
+            if (el) {
+                el.scrollTop = 0;
+            }
+        });
     });
 });
