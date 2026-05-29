@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="page-container items-center justify-center">
     <MainPage />
   </div>
 </template>
@@ -12,23 +12,3 @@ useHead({
 })
 </script>
 
-<style scoped>
-.container {
-  min-width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-h1 {
-  font-size: 2.5rem;
-  color: #1a1a2e;
-}
-
-p {
-  font-size: 1.2rem;
-  color: #555;
-}
-</style>

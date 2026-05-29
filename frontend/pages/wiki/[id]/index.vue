@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="page-container">
     <WikiArticlePage :article-id="id"/>
   </div>
 </template>
@@ -15,11 +15,3 @@ useHead({
 })
 </script>
 
-<style scoped>
-.container {
-  min-width: 100%;
-  height: 100%;
-}
-
-
-</style>

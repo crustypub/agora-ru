@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="page-container">
     <WikiPage />
   </div>
 </template>
@@ -12,11 +12,3 @@ useHead({
 });
 </script>
 
-<style scoped lang="scss">
-.container {
-  min-width: 100%;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-}
-</style>
