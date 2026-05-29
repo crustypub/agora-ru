@@ -12,16 +12,13 @@
           container: 'top-14 h-[calc(100vh-3.5rem)]'
         }"
       >
-        <!-- Sidebar links -->
         <UNavigationMenu
           orientation="vertical"
           :items="navItems"
-          class="px-2"
           :collapsed="!isSidebarOpen"
           :tooltip="true"
           :ui="{
             root: 'w-full group/nav-menu',
-            link: 'font-medium text-sm group-data-[collapsed=true]/nav-menu:justify-center group-data-[collapsed=true]/nav-menu:w-8 group-data-[collapsed=true]/nav-menu:h-8 group-data-[collapsed=true]/nav-menu:p-0 group-data-[collapsed=true]/nav-menu:mx-auto group-data-[collapsed=true]/nav-menu:before:inset-0',
             linkLeadingIcon: 'w-5 h-5 min-w-5 shrink-0'
           }"
         />
@@ -178,6 +175,36 @@ const sidebarUserItems = computed(() => {
       padding-left: 0;
       padding-right: 0;
       gap: 0;
+    }
+
+    // Center navigation menu items when collapsed
+    [data-slot="list"] {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    [data-slot="item"] {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    [data-slot="link"] {
+      justify-content: center !important;
+      width: 2rem !important; /* w-8 */
+      height: 2rem !important; /* h-8 */
+      padding: 0 !important;
+      margin: 0.25rem auto !important;
+
+      &::before {
+        inset: 0 !important;
+      }
+    }
+
+    [data-slot="linkLeadingIcon"] {
+      margin: 0 !important;
     }
   }
 }
