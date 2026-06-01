@@ -142,7 +142,6 @@ const handleSubmit = async function () {
 
 .user-settings-card {
   width: 100%;
-  max-width: 680px;
 
   &__header {
     display: flex;
