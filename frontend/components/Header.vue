@@ -26,7 +26,9 @@
 </template>
 
 <script setup lang="ts">
-const isSidebarOpen = useState('isSidebarOpen');
+import { useSidebar } from '~/composables/useSidebar';
+
+const isSidebarOpen = useSidebar();
 </script>
 
 <style lang="scss" scoped>

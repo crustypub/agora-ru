@@ -55,13 +55,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
+import { useRoute } from '#app';
 import { useNavigation } from '~/composables/useNavigation';
 import { useAuthUser } from '~/composables/useAuthUser';
+import { useSidebar } from '~/composables/useSidebar';
 
-const isSidebarOpen = useState('isSidebarOpen', () => true);
+const isSidebarOpen = useSidebar();
 const { navItems } = useNavigation();
 const authUser = useAuthUser();
+const route = useRoute();
+
+// Close sidebar on mobile/tablet viewports upon routing to a new page
+watch(() => route.fullPath, () => {
+  if (import.meta.client && window.innerWidth < 1024) {
+    isSidebarOpen.value = false;
+  }
+});
 
 const handleLogout = () => {
   const token = useCookie('auth_token');
