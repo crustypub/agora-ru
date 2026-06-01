@@ -100,6 +100,9 @@
 }
 
 @theme {
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+
   /* GREEK BLUE - #0D5EAF */
   --color-greek-blue-50: #e6f0f9;
   --color-greek-blue-100: #cce1f3;
