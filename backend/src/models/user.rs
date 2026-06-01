@@ -24,6 +24,6 @@ pub struct UpdateUserInfoRequest {
     #[validate(length(min = 1, max = 32))]
     pub first_name: Option<String>,
 
-    #[validate(length(min = 1, max = 32))]
+    #[validate(length(max = 32))]
     pub last_name: Option<String>,
 }

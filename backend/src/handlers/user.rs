@@ -29,7 +29,11 @@ pub async fn update_user_info(
         SET
             username         = COALESCE($2, username),
             first_name       = COALESCE($3, first_name),
-            last_name        = COALESCE($4, last_name)
+            last_name        = CASE
+                WHEN $4 IS NULL THEN last_name
+                WHEN $4 = '' THEN NULL
+                ELSE $4
+            END
         WHERE id = $1
         RETURNING
             id,

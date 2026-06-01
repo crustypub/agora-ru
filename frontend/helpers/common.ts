@@ -10,3 +10,15 @@ export const postFormatDateTime = (unixtime: number): string => {
 
     return `${day}.${month}.${year} ${hours}:${minutes}`;
 };
+
+export function removeEmptyStrings<T extends Record<string, any>>(obj: T): Partial<T> {
+    const result: Partial<T> = {};
+    
+    for (const key in obj) {
+        if (!!obj[key] && obj[key] !== '') {
+            result[key] = obj[key];
+        }
+    }
+    
+    return result;
+}
