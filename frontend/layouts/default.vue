@@ -4,35 +4,21 @@
 
     <div class="layout-body">
       <!-- Sidebar -->
-      <USidebar
-        v-model:open="isSidebarOpen"
-        variant="inset"
-        collapsible="icon"
-        :ui="{
-          container: 'top-14 h-[calc(100vh-3.5rem)]'
-        }"
-      >
-        <UNavigationMenu
-          orientation="vertical"
-          :items="navItems"
-          :collapsed="!isSidebarOpen"
-          :tooltip="true"
-          :ui="{
-            root: 'w-full group/nav-menu',
-            linkLeadingIcon: 'w-5 h-5 min-w-5 shrink-0'
-          }"
-        />
+      <USidebar v-model:open="isSidebarOpen" variant="inset" collapsible="icon" :ui="{
+        container: 'top-14 h-[calc(100vh-3.5rem)]'
+      }">
+        <UNavigationMenu orientation="vertical" :items="navItems" :collapsed="!isSidebarOpen" :tooltip="true" :ui="{
+          root: 'w-full group/nav-menu',
+          linkLeadingIcon: 'w-5 h-5 min-w-5 shrink-0'
+        }" />
 
         <template #footer>
           <div v-if="authUser" class="w-full">
             <UDropdownMenu :items="sidebarUserItems" :popper="{ placement: 'right-end' }" class="w-full">
-              <button class="flex items-center gap-2 px-2 py-1.5 w-full overflow-hidden sidebar-footer-inner text-left hover:bg-[var(--ui-bg-hovered)] transition-colors duration-200 cursor-pointer border-0 bg-transparent rounded-none outline-none">
-                <UAvatar
-                  :src="authUser.avatar_url || ''"
-                  :alt="authUser.first_name || authUser.username || ''"
-                  size="sm"
-                  class="shrink-0"
-                />
+              <button
+                class="flex items-center gap-2 px-2 py-1.5 w-full overflow-hidden sidebar-footer-inner text-left hover:bg-[var(--ui-bg-hovered)] transition-colors duration-200 cursor-pointer border-0 bg-transparent rounded-none outline-none">
+                <UAvatar :src="authUser.avatar_url || ''" :alt="authUser.first_name || authUser.username || ''"
+                  size="sm" class="shrink-0" />
                 <div class="flex flex-col min-w-0 sidebar-user-info">
                   <span class="text-xs font-semibold truncate text-[var(--ui-text-highlighted)]">
                     {{ authUser.first_name || authUser.username }}
@@ -41,21 +27,15 @@
                     @{{ authUser.username }}
                   </span>
                 </div>
-                <UIcon
-                  name="material-symbols:more-vert"
-                  class="ml-auto shrink-0 sidebar-more-icon text-[var(--ui-text-muted)] w-4 h-4"
-                />
+                <UIcon name="material-symbols:more-vert"
+                  class="ml-auto shrink-0 sidebar-more-icon text-[var(--ui-text-muted)] w-4 h-4" />
               </button>
             </UDropdownMenu>
           </div>
           <div v-else class="w-full px-2 py-1.5">
-            <UButton
-              to="/auth"
-              icon="material-symbols:login-rounded"
-              variant="ghost"
+            <UButton to="/auth" icon="material-symbols:login-rounded" variant="ghost"
               class="w-full flex items-center gap-2 sidebar-login-btn text-[var(--ui-text-muted)] hover:text-[var(--ui-text-highlighted)] hover:bg-[var(--ui-bg-hovered)]"
-              :class="{ 'justify-center px-0': !isSidebarOpen, 'justify-start': isSidebarOpen }"
-            >
+              :class="{ 'justify-center px-0': !isSidebarOpen, 'justify-start': isSidebarOpen }">
               <span v-if="isSidebarOpen" class="text-xs font-semibold">Войти</span>
             </UButton>
           </div>
@@ -84,29 +64,39 @@ const { navItems } = useNavigation();
 const authUser = useAuthUser();
 
 const handleLogout = () => {
-    const token = useCookie('auth_token');
-    token.value = null;
-    authUser.value = null;
-    navigateTo('/');
+  const token = useCookie('auth_token');
+  token.value = null;
+  authUser.value = null;
+  navigateTo('/');
 };
 
+const handleToSettings = () => {
+  navigateTo('/settings');
+};
+
+
 const sidebarUserItems = computed(() => {
-    const items = [];
+  const items = [];
 
-    if (authUser.value) {
-        items.push({
-            label: `Профиль: ${authUser.value.first_name || authUser.value.username}`,
-            icon: 'material-symbols:account-circle-outline',
-            disabled: true,
-        });
-        items.push({
-            label: 'Выйти',
-            icon: 'material-symbols:logout-rounded',
-            onSelect: () => handleLogout(),
-        });
-    }
+  if (authUser.value) {
+    items.push({
+      label: `Профиль: ${authUser.value.first_name || authUser.value.username}`,
+      icon: 'material-symbols:account-circle-outline',
+      disabled: true,
+    });
+    items.push({
+      label: 'Настройки',
+      icon: 'material-symbols:settings-outline',
+      onSelect: () => handleToSettings(),
+    });
+    items.push({
+      label: 'Выйти',
+      icon: 'material-symbols:logout-rounded',
+      onSelect: () => handleLogout(),
+    });
+  }
 
-    return [items];
+  return [items];
 });
 </script>
 
@@ -126,7 +116,8 @@ const sidebarUserItems = computed(() => {
     flex-direction: row;
     min-height: 0;
     width: 100%;
-    background-color: var(--ui-bg-muted, #f8f9fa); /* Gray background to make inset panels pop */
+    background-color: var(--ui-bg-muted, #f8f9fa);
+    /* Gray background to make inset panels pop */
   }
 
   .layout-main {
@@ -165,6 +156,7 @@ const sidebarUserItems = computed(() => {
 
   // Centering avatar and hiding texts/buttons when sidebar is collapsed in icon mode
   :deep([data-state="collapsed"]) {
+
     .sidebar-user-info,
     .sidebar-more-icon {
       display: none !important;
@@ -193,8 +185,10 @@ const sidebarUserItems = computed(() => {
 
     [data-slot="link"] {
       justify-content: center !important;
-      width: 2rem !important; /* w-8 */
-      height: 2rem !important; /* h-8 */
+      width: 2rem !important;
+      /* w-8 */
+      height: 2rem !important;
+      /* h-8 */
       padding: 0 !important;
       margin: 0.25rem auto !important;
 
