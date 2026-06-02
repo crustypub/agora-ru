@@ -7,7 +7,7 @@
         variant="ghost"
         color="neutral"
         size="sm"
-        @click="navigateTo('/wiki')"
+        @click="goBack"
       >
         Назад к списку
       </UButton>
@@ -167,6 +167,7 @@ interface IProps {
 }
 
 const props = defineProps<IProps>();
+const router = useRouter();
 
 const articleIdStr = computed(() => {
   if (Array.isArray(props.articleId)) return props.articleId[0];
@@ -202,6 +203,10 @@ const formatDate = (timestamp: number) => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+const goBack = () => {
+  router.back();
 };
 
 const handleEditSubmit = () => {
