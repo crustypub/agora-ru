@@ -37,7 +37,10 @@ pub struct AppState {
     pub pool: PgPool,
     pub bot_token: String,
     pub jwt_secret: String,
+    pub bot_username: String,
+    pub client: reqwest::Client,
 }
+
 
 pub fn default_page() -> i64 {
     1

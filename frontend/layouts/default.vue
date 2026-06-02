@@ -73,12 +73,18 @@ watch(() => route.fullPath, () => {
   }
 });
 
-const handleLogout = () => {
+const handleLogout = async () => {
+  try {
+    await useApiCall('/api/auth/logout', { method: 'POST' });
+  } catch (e) {
+    console.error("Logout request failed:", e);
+  }
   const token = useCookie('auth_token');
   token.value = null;
   authUser.value = null;
   navigateTo('/');
 };
+
 
 const handleToSettings = () => {
   navigateTo('/settings');

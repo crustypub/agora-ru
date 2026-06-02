@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, http, web::{self, service}};
+use actix_web::{App, HttpServer, http, web::{self}};
 
 mod db;
 mod handlers;
@@ -8,7 +8,7 @@ mod models;
 
 use db::setup::setup_db;
 use handlers::{
-    auth::{telegram_auth, auth_me},
+    auth::{telegram_auth, telegram_auth_request, telegram_auth_check, telegram_logout, auth_me},
     post::{create_post, get_posts, post_rating_update},
     wiki::{create_wiki_article, get_wiki_article, get_wiki_types, update_wiki_article, delete_wiki_article},
 };
@@ -30,10 +30,30 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to run migrations");
 
+    let client = helpers::proxy::get_telegram_client().expect("Failed to initialize HTTP client");
+    
+    // Get bot username from Telegram API
+    let bot_username = helpers::telegram_bot::get_bot_username(&client, &bot_token)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Warning: Failed to fetch Telegram bot username: {}. Polling might fail.", e);
+            "unknown_bot".to_string()
+        });
+
+    // Start background polling task
+    let polling_client = client.clone();
+    let polling_token = bot_token.clone();
+    let polling_pool = pool.clone();
+    tokio::spawn(async move {
+        helpers::telegram_bot::run_bot_polling(polling_client, polling_token, polling_pool).await;
+    });
+
     let app_state: web::Data<AppState> = web::Data::new(AppState {
         pool,
         bot_token,
         jwt_secret,
+        bot_username,
+        client,
     });
 
     HttpServer::new(move || {
@@ -53,6 +73,9 @@ async fn main() -> std::io::Result<()> {
         App::new().wrap(cors).app_data(app_state.clone()).service(
             web::scope("/api")
                 .service(telegram_auth)
+                .service(telegram_auth_request)
+                .service(telegram_auth_check)
+                .service(telegram_logout)
                 .service(auth_me)
                 .service(get_posts)
                 .service(create_post)
