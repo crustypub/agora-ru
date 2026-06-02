@@ -44,6 +44,13 @@ export default defineAppConfig({
             slots: {
                 trigger: 'cursor-pointer'
             }
+        },
+        select: {
+            slots: {
+                content: 'w-auto min-w-(--reka-select-trigger-width)',
+                itemLabel: 'overflow-visible text-clip',
+            }
         }
     }
 })
+
