@@ -39,6 +39,7 @@ pub struct AppState {
     pub jwt_secret: String,
     pub bot_username: String,
     pub client: reqwest::Client,
+    pub s3_client: aws_sdk_s3::Client,
 }
 
 
