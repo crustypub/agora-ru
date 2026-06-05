@@ -4,18 +4,11 @@ use aws_sdk_s3::Client as S3Client;
 use std::env;
 
 pub async fn setup_s3_client() -> S3Client {
-    let endpoint = env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://minio:9000".to_string());
+    let endpoint = env::var("S3_ENDPOINT").expect("S3_ENDPOINT must be set");
     
-    // We check S3_ACCESS_KEY first, then fallback to MINIO_ROOT_USER
-    let access_key = env::var("S3_ACCESS_KEY")
-        .or_else(|_| env::var("MINIO_ROOT_USER"))
-        .expect("S3_ACCESS_KEY or MINIO_ROOT_USER must be set");
-        
-    let secret_key = env::var("S3_SECRET_KEY")
-        .or_else(|_| env::var("MINIO_ROOT_PASSWORD"))
-        .expect("S3_SECRET_KEY or MINIO_ROOT_PASSWORD must be set");
-        
-    let region = env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
+    let access_key = env::var("S3_ACCESS_KEY").expect("S3_ACCESS_KEY must be set");
+    let secret_key = env::var("S3_SECRET_KEY").expect("S3_SECRET_KEY must be set");
+    let region = env::var("S3_REGION").expect("S3_REGION must be set");
 
     let credentials = Credentials::new(
         access_key,
@@ -39,7 +32,7 @@ pub async fn setup_s3_client() -> S3Client {
     let client = S3Client::from_conf(s3_config);
 
     // Verify bucket exists, if not, panic
-    let bucket_name = env::var("S3_BUCKET_AVATARS").unwrap_or_else(|_| "avatars".to_string());
+    let bucket_name = env::var("S3_BUCKET_AVATARS").expect("S3_BUCKET_AVATARS must be set");
     if let Err(e) = client.head_bucket().bucket(&bucket_name).send().await {
         panic!("S3 bucket '{}' is not available or does not exist: {:?}", bucket_name, e);
     } else {

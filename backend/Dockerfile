@@ -1,5 +1,5 @@
 # --- Этап разработки (Development) ---
-FROM rust:1.88-bookworm AS dev
+FROM rust:1.91-bookworm AS dev
 
 # Устанавливаем инструменты для быстрой разработки
 RUN apt-get update && apt-get install -y clang mold && rm -rf /var/lib/apt/lists/*
