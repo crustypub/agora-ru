@@ -138,7 +138,30 @@ pub async fn upload_avatar(
     }
 
     let bucket_name = std::env::var("S3_BUCKET_AVATARS").expect("S3_BUCKET_AVATARS must be set");
-    let key = format!("{}.webp", user.id);
+
+    // Fetch current avatar from DB to delete it from S3
+    let current_avatar: Option<String> = match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await 
+    {
+        Ok(Some(url_opt)) => url_opt,
+        _ => None,
+    };
+
+    if let Some(old_url) = current_avatar {
+        if let Some(filename) = old_url.rsplit('/').next() {
+            // Delete old file from S3 (ignore errors to avoid blocking upload if S3 file was manually removed)
+            let _ = state.s3_client.delete_object()
+                .bucket(&bucket_name)
+                .key(filename)
+                .send()
+                .await;
+        }
+    }
+
+    // Generate unique key based on user_id and new UUID
+    let key = format!("{}_{}.webp", user.id, uuid::Uuid::new_v4());
 
     // Upload to S3 (MinIO)
     if let Err(e) = state.s3_client.put_object()
@@ -188,19 +211,32 @@ pub async fn delete_avatar(
     user: AuthenticatedUser,
     state: web::Data<AppState>
 ) -> impl Responder {
-    let key = format!("{}.webp", user.id);
     let bucket_name = std::env::var("S3_BUCKET_AVATARS").expect("S3_BUCKET_AVATARS must be set");
 
-    if let Err(e) = state.s3_client.delete_object()
-        .bucket(&bucket_name)
-        .key(&key)
-        .send()
+    // Fetch current avatar from DB to delete it from S3
+    let current_avatar: Option<String> = match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
         .await 
     {
-        eprintln!("Failed to delete avatar from S3: {:?}", e);
-        return HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to delete avatar from S3"
-        }));
+        Ok(Some(url_opt)) => url_opt,
+        _ => None,
+    };
+
+    if let Some(old_url) = current_avatar {
+        if let Some(filename) = old_url.rsplit('/').next() {
+            if let Err(e) = state.s3_client.delete_object()
+                .bucket(&bucket_name)
+                .key(filename)
+                .send()
+                .await 
+            {
+                eprintln!("Failed to delete avatar from S3: {:?}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to delete avatar from S3"
+                }));
+            }
+        }
     }
 
     // Delete avatar_url in the database
