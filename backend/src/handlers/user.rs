@@ -6,7 +6,7 @@ use std::io::Cursor;
 use image::ImageFormat;
 
 use crate::{
-    helpers::api::AuthenticatedUser,
+    helpers::{api::AuthenticatedUser, images},
     models::{
         app::AppState,
         user::{UpdateUserInfoRequest, User},
@@ -76,68 +76,32 @@ pub async fn update_user_info(
 #[post("/user/avatar")]
 pub async fn upload_avatar(
     user: AuthenticatedUser,
-    mut payload: Multipart,
+    payload: Multipart,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let mut bytes = Vec::new();
-    
-    // Read files from multipart request
-    while let Some(item) = payload.next().await {
-        match item {
-            Ok(mut field) => {
-                while let Some(chunk_result) = field.next().await {
-                    match chunk_result {
-                        Ok(chunk) => {
-                            bytes.extend_from_slice(&chunk);
-                        }
-                        Err(e) => {
-                            eprintln!("Error reading field chunk: {}", e);
-                            return HttpResponse::BadRequest().json(serde_json::json!({
-                                "error": "Failed to read file chunk"
-                            }));
-                        }
-                    }
-                }
-                break; // Only process the first field
-            }
-            Err(e) => {
-                eprintln!("Error reading multipart: {}", e);
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "Failed to parse multipart request"
-                }));
-            }
-        }
-    }
+    // 5 MB limit
+    let max_size = 5 * 1024 * 1024;
 
-    if bytes.is_empty() {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "No file uploaded"
-        }));
-    }
-
-    // Load image from memory (checks supported photo formats)
-    let img = match image::load_from_memory(&bytes) {
-        Ok(i) => i,
-        Err(_) => {
+    let bytes = match images::read_first_file(payload, max_size).await {
+        Ok(b) => b,
+        Err(e) => {
             return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Invalid image format. Supported formats: JPEG, PNG, WebP, GIF, BMP"
+                "error": e
             }));
         }
     };
 
     // Resize to 400x400 thumbnail
-    let resized = img.thumbnail(400, 400);
+    let webp_bytes = match images::resize_and_encode_webp(&bytes, 400, 400) {
+        Ok(b) => b,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": e
+            }));
+        }
+    };
 
-    // Convert/encode to WebP format
-    let mut webp_bytes = Vec::new();
-    if let Err(e) = resized.write_to(&mut Cursor::new(&mut webp_bytes), ImageFormat::WebP) {
-        eprintln!("Failed to encode image to WebP: {}", e);
-        return HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to process image"
-        }));
-    }
-
-    let bucket_name = std::env::var("S3_BUCKET_AVATARS").expect("S3_BUCKET_AVATARS must be set");
+    let bucket_name = String::from("avatars");
 
     // Fetch current avatar from DB to delete it from S3
     let current_avatar: Option<String> = match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")
@@ -179,7 +143,15 @@ pub async fn upload_avatar(
     }
 
     // Determine the public URL of the avatar
-    let public_endpoint = std::env::var("S3_PUBLIC_URL").expect("S3_PUBLIC_URL must be set");
+    let public_endpoint = match std::env::var("S3_PUBLIC_URL") {
+        Ok(val) => val,
+        Err(_) => {
+            eprintln!("S3_PUBLIC_URL must be set");
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "S3 configuration error"
+            }));
+        }
+    };
     
     let avatar_url = format!("{}/{}/{}", public_endpoint, &bucket_name, &key);
 
@@ -211,7 +183,7 @@ pub async fn delete_avatar(
     user: AuthenticatedUser,
     state: web::Data<AppState>
 ) -> impl Responder {
-    let bucket_name = std::env::var("S3_BUCKET_AVATARS").expect("S3_BUCKET_AVATARS must be set");
+    let bucket_name = String::from("avatars");
 
     // Fetch current avatar from DB to delete it from S3
     let current_avatar: Option<String> = match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")

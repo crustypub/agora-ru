@@ -32,7 +32,7 @@ pub async fn setup_s3_client() -> S3Client {
     let client = S3Client::from_conf(s3_config);
 
     // Verify bucket exists, if not, panic
-    let bucket_name = env::var("S3_BUCKET_AVATARS").expect("S3_BUCKET_AVATARS must be set");
+    let bucket_name = String::from("avatars");
     if let Err(e) = client.head_bucket().bucket(&bucket_name).send().await {
         panic!("S3 bucket '{}' is not available or does not exist: {:?}", bucket_name, e);
     } else {
