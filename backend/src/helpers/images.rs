@@ -44,3 +44,60 @@ pub fn resize_and_encode_webp(bytes: &[u8], width: u32, height: u32) -> Result<V
 
     Ok(webp_bytes)
 }
+
+/// Extracts all S3 object keys for wiki article media from a markdown content.
+pub fn extract_wiki_image_keys(content: &str) -> Vec<String> {
+    let mut keys = Vec::new();
+    let pattern = "wiki-articles-media/";
+    let mut search_idx = 0;
+    while let Some(start_idx) = content[search_idx..].find(pattern) {
+        let actual_start = search_idx + start_idx + pattern.len();
+        let end_idx = content[actual_start..].find(|c: char| {
+            !c.is_alphanumeric() && c != '_' && c != '-' && c != '.'
+        }).unwrap_or(content[actual_start..].len());
+        
+        let key = &content[actual_start..actual_start + end_idx];
+        if !key.is_empty() {
+            keys.push(key.to_string());
+        }
+        search_idx = actual_start + end_idx;
+    }
+    keys
+}
+
+/// Deletes images from S3 that were present in `old_content` but are missing in `new_content`.
+pub async fn cleanup_unused_images(
+    old_content: &str,
+    new_content: &str,
+    s3_client: &aws_sdk_s3::Client,
+) {
+    let old_keys = extract_wiki_image_keys(old_content);
+    let new_keys = extract_wiki_image_keys(new_content);
+
+    let bucket_name = "wiki-articles-media";
+    for key in old_keys {
+        if !new_keys.contains(&key) {
+            let _ = s3_client.delete_object()
+                .bucket(bucket_name)
+                .key(&key)
+                .send()
+                .await;
+        }
+    }
+}
+
+/// Deletes all S3 images referenced in the markdown content.
+pub async fn delete_all_images(
+    content: &str,
+    s3_client: &aws_sdk_s3::Client,
+) {
+    let keys = extract_wiki_image_keys(content);
+    let bucket_name = "wiki-articles-media";
+    for key in keys {
+        let _ = s3_client.delete_object()
+            .bucket(bucket_name)
+            .key(&key)
+            .send()
+            .await;
+    }
+}

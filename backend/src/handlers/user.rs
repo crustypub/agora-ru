@@ -1,10 +1,6 @@
 use actix_web::{patch, post, delete, web, HttpResponse, Responder};
 use validator::Validate;
 use actix_multipart::Multipart;
-use futures_util::StreamExt;
-use std::io::Cursor;
-use image::ImageFormat;
-
 use crate::{
     helpers::{api::AuthenticatedUser, images},
     models::{
