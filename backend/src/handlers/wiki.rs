@@ -1,9 +1,11 @@
 use crate::helpers::api::{AuthenticatedUser, MaybeAuthenticatedUser};
+use crate::helpers::images;
 use crate::models::app::{AppState, SortField};
 use crate::models::wiki::{
     CreateWikiArticle, CreateWikiArticleRequest, CreateWikiArticleResponse, CreateWikiStar,
     UpdateWikiArticleRequest, WikIArticlesParams, Wiki, WikiListItem, WikiType, WikiTypeResponse,
 };
+use actix_multipart::Multipart;
 use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
 use sqlx::{Error, PgPool};
 use uuid::Uuid;
@@ -98,15 +100,19 @@ pub async fn get_wiki_articles(
             ))
     "#;
 
-    let search = params.search.as_deref().filter(|s| !s.is_empty()).map(crate::helpers::api::escape_like_pattern);
+    let search = params
+        .search
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(crate::helpers::api::escape_like_pattern);
 
     let articles_result = sqlx::query_as::<_, WikiListItem>(&articles_sql)
-        .bind(params.wiki_type)    // $1 — wiki_type
+        .bind(params.wiki_type) // $1 — wiki_type
         .bind(params.is_confirmed) // $2 — is_confirmed
-        .bind(&search)             // $3 — search
-        .bind(limit)               // $4 — limit
-        .bind(offset)              // $5 — offset
-        .bind(current_user_id)     // $6 — current_user_id (для is_starred)
+        .bind(&search) // $3 — search
+        .bind(limit) // $4 — limit
+        .bind(offset) // $5 — offset
+        .bind(current_user_id) // $6 — current_user_id (для is_starred)
         .fetch_all(&state.pool)
         .await;
 
@@ -213,8 +219,9 @@ pub async fn create_wiki_article(
     let author_id = user.id;
 
     if let Err(errors) = params.validate() {
-        return HttpResponse::BadRequest()
-            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+        return HttpResponse::BadRequest().json(
+            serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }),
+        );
     }
 
     let wiki_article_create_result = sqlx::query_as::<_, CreateWikiArticle>(
@@ -282,7 +289,11 @@ pub async fn create_wiki_article(
 }
 
 #[get("/wiki/{id}")]
-pub async fn get_wiki_article(user: MaybeAuthenticatedUser, path: web::Path<Uuid>, state: web::Data<AppState>) -> impl Responder {
+pub async fn get_wiki_article(
+    user: MaybeAuthenticatedUser,
+    path: web::Path<Uuid>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let article_id = path.into_inner();
 
     let current_user_id = user.id;
@@ -393,11 +404,9 @@ pub async fn add_star_to_wiki(
             .await;
 
             match wiki_article_create_result {
-                Ok(_article) => {
-                    HttpResponse::Ok().json(serde_json::json!({
-                        "status": "success",
-                    }))
-                }
+                Ok(_article) => HttpResponse::Ok().json(serde_json::json!({
+                    "status": "success",
+                })),
                 Err(e) => {
                     eprintln!("Database error: {}", e);
                     HttpResponse::InternalServerError()
@@ -405,8 +414,9 @@ pub async fn add_star_to_wiki(
                 }
             }
         }
-        Ok(false) => HttpResponse::NotFound()
-            .json(serde_json::json!({ "error": "Wiki article not found" })),
+        Ok(false) => {
+            HttpResponse::NotFound().json(serde_json::json!({ "error": "Wiki article not found" }))
+        }
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
@@ -434,20 +444,20 @@ pub async fn remove_star_from_wiki(
             .await;
 
             match delete_result {
-                Ok(_) => {
-                    HttpResponse::Ok().json(serde_json::json!({
-                        "status": "success",
-                    }))
-                }
+                Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+                    "status": "success",
+                })),
                 Err(e) => {
                     eprintln!("Database error: {}", e);
-                    HttpResponse::InternalServerError()
-                        .json(serde_json::json!({ "error": "Failed to remove star from wiki article." }))
+                    HttpResponse::InternalServerError().json(
+                        serde_json::json!({ "error": "Failed to remove star from wiki article." }),
+                    )
                 }
             }
         }
-        Ok(false) => HttpResponse::NotFound()
-            .json(serde_json::json!({ "error": "Wiki article not found" })),
+        Ok(false) => {
+            HttpResponse::NotFound().json(serde_json::json!({ "error": "Wiki article not found" }))
+        }
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
@@ -463,8 +473,38 @@ pub async fn update_wiki_article(
     let author_id = user.id;
 
     if let Err(errors) = body.validate() {
-        return HttpResponse::BadRequest()
-            .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
+        return HttpResponse::BadRequest().json(
+            serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }),
+        );
+    }
+
+    // 1. Fetch old content before update (only if new content is provided)
+    let mut old_content = None;
+    if body.content.is_some() {
+        let old_content_res = sqlx::query_scalar::<_, String>(
+            "SELECT content FROM wiki_articles WHERE id = $1 AND created_by = $2",
+        )
+        .bind(article_id)
+        .bind(author_id)
+        .fetch_optional(&state.pool)
+        .await;
+
+        match old_content_res {
+            Ok(Some(content)) => {
+                old_content = Some(content);
+            }
+            Ok(None) => {
+                return HttpResponse::Forbidden().json(serde_json::json!({
+                    "error": "Article not found or you are not the author"
+                }));
+            }
+            Err(e) => {
+                eprintln!("DB error fetching old wiki article: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to update wiki article"
+                }));
+            }
+        }
     }
 
     // Атомарная проверка авторства + обновление одним запросом:
@@ -515,13 +555,18 @@ pub async fn update_wiki_article(
     .await;
 
     match result {
-        Ok(Some(article)) => HttpResponse::Ok().json(serde_json::json!({
-            "status": "success",
-            "data": article,
-        })),
-        Ok(None) => HttpResponse::Forbidden().json(
-            serde_json::json!({ "error": "Article not found or you are not the author" })
-        ),
+        Ok(Some(article)) => {
+            // Clean up S3 images if content changed
+            if let (Some(old), Some(ref new)) = (old_content, &body.content) {
+                images::cleanup_unused_images(&old, new, &state.s3_client).await;
+            }
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": article,
+            }))
+        }
+        Ok(None) => HttpResponse::Forbidden()
+            .json(serde_json::json!({ "error": "Article not found or you are not the author" })),
         Err(e) => {
             eprintln!("DB error updating wiki article: {}", e);
             HttpResponse::InternalServerError()
@@ -539,27 +584,94 @@ pub async fn delete_wiki_article(
     let article_id = path.into_inner();
     let author_id = user.id;
 
-    // Атомарно: удаляем только если created_by совпадает.
-    // rows_affected == 0 → не найдено или не автор → 403.
-    let result = sqlx::query(
-        "DELETE FROM wiki_articles WHERE id = $1 AND created_by = $2",
+    // Атомарно: удаляем только если created_by совпадает и возвращаем content для удаления медиа.
+    let result = sqlx::query_scalar::<_, String>(
+        "DELETE FROM wiki_articles WHERE id = $1 AND created_by = $2 RETURNING content",
     )
     .bind(article_id)
     .bind(author_id)
-    .execute(&state.pool)
+    .fetch_optional(&state.pool)
     .await;
 
     match result {
-        Ok(res) if res.rows_affected() > 0 => {
+        Ok(Some(content)) => {
+            // Delete associated images from S3
+            images::delete_all_images(&content, &state.s3_client).await;
             HttpResponse::Ok().json(serde_json::json!({ "status": "success" }))
         }
-        Ok(_) => HttpResponse::Forbidden().json(
-            serde_json::json!({ "error": "Article not found or you are not the author" })
-        ),
+        Ok(None) => HttpResponse::Forbidden()
+            .json(serde_json::json!({ "error": "Article not found or you are not the author" })),
         Err(e) => {
             eprintln!("DB error deleting wiki article: {}", e);
             HttpResponse::InternalServerError()
                 .json(serde_json::json!({ "error": "Failed to delete wiki article" }))
+        }
+    }
+}
+
+#[post("/wiki/image")]
+pub async fn upload_wiki_article_images(
+    user: AuthenticatedUser,
+    payload: Multipart,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    // 300 MB limit
+    let max_size = 300 * 1024 * 1024;
+
+    let bytes = match images::read_first_file(payload, max_size).await {
+        Ok(b) => b,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": e
+            }));
+        }
+    };
+
+    // Resize to 600x600 thumbnail
+    let webp_bytes = match images::resize_and_encode_webp(&bytes, 600, 600) {
+        Ok(b) => b,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": e
+            }));
+        }
+    };
+
+    let bucket_name = String::from("wiki-articles-media");
+    // Generate unique key based on user_id and new UUID
+    let key = format!("{}_{}.webp", user.id, uuid::Uuid::new_v4());
+
+    let public_endpoint = match std::env::var("S3_PUBLIC_URL") {
+        Ok(val) => val,
+        Err(_) => {
+            eprintln!("S3_PUBLIC_URL must be set");
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "S3 configuration error"
+            }));
+        }
+    };
+
+    let image_url = format!("{}/{}/{}", public_endpoint, &bucket_name, &key);
+
+    match state
+        .s3_client
+        .put_object()
+        .bucket(&bucket_name)
+        .key(&key)
+        .body(webp_bytes.into())
+        .content_type("image/webp")
+        .send()
+        .await
+    {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "url": image_url
+        })),
+        Err(e) => {
+            eprintln!("Failed to upload wiki image to S3: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to upload image to storage"
+            }))
         }
     }
 }
