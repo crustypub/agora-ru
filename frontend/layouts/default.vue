@@ -51,6 +51,7 @@
     </div>
 
     <MobileNav />
+    <UNotifications />
   </div>
 </template>
 

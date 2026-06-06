@@ -14,7 +14,8 @@
 
     <UFormField label="Содержимое" name="content" required>
       <ClientOnly>
-        <MdEditor v-model="state.content" language="en-US" :toolbars="activeToolbars" class="md-editor__wrapper" />
+        <MdEditor v-model="state.content" language="en-US" :toolbars="activeToolbars" class="md-editor__wrapper"
+          @on-upload-img="handleUploadImg" />
       </ClientOnly>
     </UFormField>
 
@@ -31,6 +32,7 @@ import type { ToolbarNames } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { date, z } from 'zod';
 import { useApiCall } from '~/composables/useApi';
+import { useNotify } from '~/composables/useNotify';
 import type { IWikiType } from '~/models/entities/wiki.entities';
 
 interface IProps {
@@ -87,6 +89,48 @@ onMounted(() => {
 const activeToolbars = computed(() =>
   isMobile.value ? MOBILE_TOOLBARS : DESKTOP_TOOLBARS
 );
+
+const handleUploadImg = async (
+  files: File[],
+  callback: (urls: string[]) => void
+): Promise<void> => {
+  const { error } = useNotify();
+
+  const MAX_SIZE = 300 * 1024 * 1024; // 300 MB
+  const hasOversizedFile = files.some(file => file.size > MAX_SIZE);
+  if (hasOversizedFile) {
+    error(
+      'Ошибка загрузки',
+      'Максимальный объем одного файла не должен превышать 300 МБ'
+    );
+    return;
+  }
+
+  const uploadPromises = files.map(async (file) => {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const response = await useApiCall<{ url: string }>('/api/wiki/image', {
+        method: 'POST',
+        body: form,
+      });
+      return response.url;
+    } catch (e: any) {
+      console.error(`Failed to upload file ${file.name}:`, e);
+      const serverError = e?.data?.error || `Не удалось загрузить файл "${file.name}"`;
+      error(
+        'Ошибка загрузки',
+        serverError
+      );
+      return null;
+    }
+  });
+
+  const results = await Promise.all(uploadPromises);
+  const successfulUrls = results.filter((url): url is string => url !== null);
+
+  callback(successfulUrls);
+};
 
 async function handleSubmit(event: { data: ArticleFormState }) {
   try {
