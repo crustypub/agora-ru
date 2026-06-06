@@ -75,8 +75,8 @@ pub async fn upload_avatar(
     payload: Multipart,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    // 5 MB limit
-    let max_size = 5 * 1024 * 1024;
+    // 300 MB limit
+    let max_size = 300 * 1024 * 1024;
 
     let bytes = match images::read_first_file(payload, max_size).await {
         Ok(b) => b,
