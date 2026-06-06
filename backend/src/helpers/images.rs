@@ -48,9 +48,11 @@ pub fn resize_and_encode_webp(bytes: &[u8], width: u32, height: u32) -> Result<V
 /// Extracts all S3 object keys for wiki article media from a markdown content.
 pub fn extract_wiki_image_keys(content: &str) -> Vec<String> {
     let mut keys = Vec::new();
-    let pattern = "wiki-articles-media/";
+    let bucket_name = std::env::var("MINIO_BUCKET_WIKI_MEDIA")
+        .expect("MINIO_BUCKET_WIKI_MEDIA must be set");
+    let pattern = format!("{}/", bucket_name);
     let mut search_idx = 0;
-    while let Some(start_idx) = content[search_idx..].find(pattern) {
+    while let Some(start_idx) = content[search_idx..].find(&pattern) {
         let actual_start = search_idx + start_idx + pattern.len();
         let end_idx = content[actual_start..].find(|c: char| {
             !c.is_alphanumeric() && c != '_' && c != '-' && c != '.'
@@ -74,11 +76,12 @@ pub async fn cleanup_unused_images(
     let old_keys = extract_wiki_image_keys(old_content);
     let new_keys = extract_wiki_image_keys(new_content);
 
-    let bucket_name = "wiki-articles-media";
+    let bucket_name = std::env::var("MINIO_BUCKET_WIKI_MEDIA")
+        .expect("MINIO_BUCKET_WIKI_MEDIA must be set");
     for key in old_keys {
         if !new_keys.contains(&key) {
             let _ = s3_client.delete_object()
-                .bucket(bucket_name)
+                .bucket(&bucket_name)
                 .key(&key)
                 .send()
                 .await;
@@ -92,10 +95,11 @@ pub async fn delete_all_images(
     s3_client: &aws_sdk_s3::Client,
 ) {
     let keys = extract_wiki_image_keys(content);
-    let bucket_name = "wiki-articles-media";
+    let bucket_name = std::env::var("MINIO_BUCKET_WIKI_MEDIA")
+        .expect("MINIO_BUCKET_WIKI_MEDIA must be set");
     for key in keys {
         let _ = s3_client.delete_object()
-            .bucket(bucket_name)
+            .bucket(&bucket_name)
             .key(&key)
             .send()
             .await;

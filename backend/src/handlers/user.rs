@@ -97,7 +97,8 @@ pub async fn upload_avatar(
         }
     };
 
-    let bucket_name = String::from("avatars");
+    let bucket_name = std::env::var("MINIO_BUCKET_AVATARS")
+        .expect("MINIO_BUCKET_AVATARS must be set");
 
     // Fetch current avatar from DB to delete it from S3
     let current_avatar: Option<String> = match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")
@@ -179,7 +180,8 @@ pub async fn delete_avatar(
     user: AuthenticatedUser,
     state: web::Data<AppState>
 ) -> impl Responder {
-    let bucket_name = String::from("avatars");
+    let bucket_name = std::env::var("MINIO_BUCKET_AVATARS")
+        .expect("MINIO_BUCKET_AVATARS must be set");
 
     // Fetch current avatar from DB to delete it from S3
     let current_avatar: Option<String> = match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")

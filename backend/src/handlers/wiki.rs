@@ -637,7 +637,8 @@ pub async fn upload_wiki_article_images(
         }
     };
 
-    let bucket_name = String::from("wiki-articles-media");
+    let bucket_name = std::env::var("MINIO_BUCKET_WIKI_MEDIA")
+        .expect("MINIO_BUCKET_WIKI_MEDIA must be set");
     // Generate unique key based on user_id and new UUID
     let key = format!("{}_{}.webp", user.id, uuid::Uuid::new_v4());
 

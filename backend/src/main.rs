@@ -19,6 +19,8 @@ use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenvy::from_filename("shared.env").ok();
+    dotenvy::from_filename("../shared.env").ok();
     dotenvy::dotenv().ok();
     let pool = setup_db().await;
     let bot_token = std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN not set");

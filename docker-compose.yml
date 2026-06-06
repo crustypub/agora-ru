@@ -50,6 +50,7 @@ services:
 
   backend:
     env_file:
+      - shared.env
       - .env
     build:
       context: ./backend
@@ -95,14 +96,15 @@ services:
     image: minio/mc
     container_name: agora_minio_init
     env_file:
+      - shared.env
       - .env
     entrypoint: >
       /bin/sh -c "
       until (/usr/bin/mc alias set myminio http://minio:9000 \"$${MINIO_ROOT_USER}\" \"$${MINIO_ROOT_PASSWORD}\"); do echo 'Waiting for MinIO...'; sleep 1; done;
-      /usr/bin/mc mb myminio/avatars || true;
-      /usr/bin/mc anonymous set download myminio/avatars || /usr/bin/mc policy set download myminio/avatars || true;
-      /usr/bin/mc mb myminio/wiki-articles-media || true;
-      /usr/bin/mc anonymous set download myminio/wiki-articles-media || /usr/bin/mc policy set download myminio/wiki-articles-media || true;
+      /usr/bin/mc mb myminio/\"$${MINIO_BUCKET_AVATARS}\" || true;
+      /usr/bin/mc anonymous set download myminio/\"$${MINIO_BUCKET_AVATARS}\" || /usr/bin/mc policy set download myminio/\"$${MINIO_BUCKET_AVATARS}\" || true;
+      /usr/bin/mc mb myminio/\"$${MINIO_BUCKET_WIKI_MEDIA}\" || true;
+      /usr/bin/mc anonymous set download myminio/\"$${MINIO_BUCKET_WIKI_MEDIA}\" || /usr/bin/mc policy set download myminio/\"$${MINIO_BUCKET_WIKI_MEDIA}\" || true;
       exit 0;
       "
     depends_on:
