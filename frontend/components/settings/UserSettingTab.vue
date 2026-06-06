@@ -39,7 +39,7 @@
                 v-if="authUser?.avatar_url"
                 size="xs"
                 variant="subtle"
-                color="danger"
+                color="red"
                 :loading="isAvatarLoading"
                 @click="deleteAvatar"
               >
