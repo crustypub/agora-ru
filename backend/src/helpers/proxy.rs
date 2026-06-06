@@ -13,15 +13,15 @@ pub fn get_telegram_client() -> Result<reqwest::Client, reqwest::Error> {
         let pass = std::env::var("PROXY_PASSWORD").ok();
 
         if !host.is_empty() && !port.is_empty() {
-            // Build socks5 proxy URL. If credentials are provided, embed them.
+            // Build socks5h proxy URL (remote DNS resolution). If credentials are provided, embed them.
             let proxy_url = if let (Some(u), Some(p)) = (user, pass) {
                 if !u.is_empty() && !p.is_empty() {
-                    format!("socks5://{}:{}@{}:{}", u, p, host, port)
+                    format!("socks5h://{}:{}@{}:{}", u, p, host, port)
                 } else {
-                    format!("socks5://{}:{}", host, port)
+                    format!("socks5h://{}:{}", host, port)
                 }
             } else {
-                format!("socks5://{}:{}", host, port)
+                format!("socks5h://{}:{}", host, port)
             };
 
             if let Ok(proxy) = reqwest::Proxy::all(&proxy_url) {

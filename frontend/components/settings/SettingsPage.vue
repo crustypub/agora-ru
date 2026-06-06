@@ -79,12 +79,10 @@ const items = ref<(TabsItem & { iconColor?: string })[]>([
   {
     label: 'Общие',
     icon: 'mdi:user-outline',
-    iconColor: 'var(--ui-primary)'
   },
   {
     label: 'Telegram',
     icon: 'ic:outline-telegram',
-    iconColor: '#24A1DE'
   }
 ])
 
