@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
+use std::sync::Arc;
+
+use crate::models::chat::ChatServerState;
 
 /// Направление сортировки — переиспользуется во всех эндпоинтах
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +43,7 @@ pub struct AppState {
     pub bot_username: String,
     pub client: reqwest::Client,
     pub s3_client: aws_sdk_s3::Client,
+    pub chat_server: Arc<ChatServerState>,   
 }
 
 
