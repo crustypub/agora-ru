@@ -54,7 +54,7 @@ pub fn default_limit() -> i64 {
     10
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
 pub struct Author {
     pub id: Uuid,
     pub username: Option<String>,

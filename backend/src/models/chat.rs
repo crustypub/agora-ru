@@ -2,10 +2,78 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{FromRow, PgPool};
+use sqlx::prelude::FromRow;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 use validator::Validate;
+use crate::models::app::{Author, default_limit, default_page};
+use sqlx::{types::Json};
+
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct Chat {
+    pub id: Uuid,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub direct_key: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Deserialize)]
+pub struct RoomsParams {
+    pub search_value: Option<String>,
+
+    #[serde(default = "default_page")]
+    pub page: i64,
+
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+}
+
+impl RoomsParams {
+    pub fn offset(&self) -> i64 {
+        (self.page - 1) * self.limit
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LastMessage {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub sender_id: Option<Uuid>,
+    pub content: String,
+    pub created_at: i64,
+    pub author: Option<Json<Author>>,
+}
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct ChatListItem {
+    pub id: Uuid,
+    pub room_type: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub direct_key: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub unread_count: i64,
+    pub last_message: Option<Json<LastMessage>>,
+    pub direct_user: Option<Json<Author>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatListItemResponse {
+    pub id: Uuid,
+    pub room_type: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub direct_key: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub unread_count: i64,
+    pub last_message: Option<LastMessage>,
+    pub direct_user: Option<Author>,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum ChatRoomType {
