@@ -4,6 +4,9 @@
 *.swp
 *.swo
 .agents/
+.agent/
+_bmad/
+_bmad-output/
 
 # OS
 .DS_Store

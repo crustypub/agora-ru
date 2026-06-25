@@ -77,6 +77,11 @@ export default defineNuxtConfig({
             colors: ['primary', 'secondary', 'success', 'error', 'warning', 'red', 'green'],
         },
     },
+
+    colorMode: {
+        preference: 'light',
+    },
+
     runtimeConfig: {
         // Приватные — доступны только на сервере, в браузер не утекают
         TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN,
