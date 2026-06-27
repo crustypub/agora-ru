@@ -298,7 +298,7 @@ pub async fn get_wiki_article(
 
     let current_user_id = user.id;
 
-    let wiki_article = sqlx::query_as::<_, Wiki>(
+    let wiki_article = sqlx::query_as::<_, Wiki >(
         r#"
         SELECT
             wa.id,

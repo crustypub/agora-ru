@@ -1,5 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, http, web::{self}};
+use std::sync::Arc;
 
 mod db;
 mod handlers;
@@ -14,8 +15,11 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::handlers::{user::{delete_avatar, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}};
+use crate::{handlers::{chats::get_rooms, user::{delete_avatar, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}}, models::chat::ChatServerState};
 use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get_comments};
+use crate::handlers::chats_ws::chat_ws_route;
+use crate::handlers::chats::{create_room, add_member, remove_member, delete_message, get_room_messages};
+
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -50,6 +54,7 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(async move {
         helpers::telegram_bot::run_bot_polling(polling_client, polling_token, polling_pool).await;
     });
+    let chat_server = Arc::new(ChatServerState::new());
 
     let app_state: web::Data<AppState> = web::Data::new(AppState {
         pool,
@@ -58,6 +63,7 @@ async fn main() -> std::io::Result<()> {
         bot_username,
         client,
         s3_client,
+        chat_server,
     });
 
     HttpServer::new(move || {
@@ -100,6 +106,13 @@ async fn main() -> std::io::Result<()> {
                 .service(update_user_info)
                 .service(upload_avatar)
                 .service(delete_avatar)
+                .service(chat_ws_route)
+                .service(create_room)
+                .service(get_rooms)
+                .service(get_room_messages)
+                .service(add_member)
+                .service(remove_member)
+                .service(delete_message)
         )
     })
     .bind(("0.0.0.0", 6080))?

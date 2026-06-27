@@ -4,3 +4,4 @@ pub mod proxy;
 pub mod telegram_bot;
 pub mod s3;
 pub mod images;
+pub mod chats;
