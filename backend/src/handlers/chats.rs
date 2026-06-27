@@ -3,16 +3,11 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    helpers::api::AuthenticatedUser,
-    models::{
-        app::AppState,
-        chat::{
-            AddMemberRequest, ChatRoomType, CreateChatRoomRequest, DeleteMessageQuery,
-            MessageDeletedNotification, RoomsParams, WsMessage, ChatListItemResponse,
-            ChatMessageResponse,
+    helpers::{api::AuthenticatedUser, chats::{ChatError, MessageDeletionResult::EveryoneDeleted, create_direct_room}}, models::{
+        app::AppState, chat::{
+            AddMemberRequest, ChatListItemResponse, ChatMessageResponse, ChatRoomType, CreateChatRoomRequest, DeleteMessageQuery, MessageDeletedNotification, RoomsParams, WsMessage,
         },
     },
-    helpers::chats::ChatError,
 };
 
 /// Получает пагинированный список чат-комнат пользователя.
@@ -161,12 +156,22 @@ pub async fn create_room(
                 ChatError::BadRequest("direct_user_id is required for direct chats".to_string())
             })?;
 
-            let (room_id, already_exists) = crate::helpers::chats::create_direct_room(
+            let (room_id, already_exists) = create_direct_room(
                 &state.pool,
                 author_id,
                 user_2,
             )
             .await?;
+            
+            if !already_exists {
+                let ws_message = WsMessage {
+                    event: "room_created".to_string(),
+                    payload: serde_json::json!({ "room_id": room_id }),
+                };
+
+                state.chat_server.send_to_user(&author_id, ws_message.clone());
+                state.chat_server.send_to_user(&author_id, ws_message);
+            }
 
             Ok(HttpResponse::Ok().json(serde_json::json!({
                 "status": "success",
@@ -276,7 +281,7 @@ pub async fn delete_message(
     .await?;
 
     // Если удалили для всех, рассылаем уведомление по WebSocket
-    if let crate::helpers::chats::MessageDeletionResult::EveryoneDeleted { room_id } = result {
+    if let EveryoneDeleted { room_id } = result {
         if let Ok(members) = sqlx::query!(
             "SELECT user_id FROM room_members WHERE room_id = $1",
             room_id
