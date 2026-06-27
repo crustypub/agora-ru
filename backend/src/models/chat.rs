@@ -122,7 +122,15 @@ pub struct ChatMessageResponse {
     pub created_at: i64,
     pub author: Option<Author>,
 }
-
+#[derive(Debug, sqlx::FromRow, Serialize, Deserialize, Clone)]
+pub struct RoomMemberInfo {
+    pub id: Uuid,
+    pub username: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub role: String,
+}
 
 type Tx = mpsc::UnboundedSender<WsMessage>;
 

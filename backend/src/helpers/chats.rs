@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 use actix_web::{ResponseError, HttpResponse, http::StatusCode};
 use std::fmt;
-use crate::models::chat::{WsMessage, SendMessagePayload, ReadRoomPayload, ChatListItem, ChatMessage};
+use crate::models::chat::{WsMessage, SendMessagePayload, ReadRoomPayload, ChatListItem, ChatMessage, RoomMemberInfo};
 
 /// Кастомное перечисление ошибок для чат-системы.
 /// Реализует `ResponseError`, что позволяет автоматически преобразовывать ошибки
@@ -680,6 +680,7 @@ pub async fn ws_session_loop(
 pub struct PaginatedMessages {
     pub messages: Vec<ChatMessage>,
     pub total_count: i64,
+    pub members: Vec<RoomMemberInfo>,
 }
 
 /// Получает историю сообщений конкретной комнаты с поддержкой поиска и пагинации.
@@ -766,6 +767,25 @@ pub async fn get_room_messages_paginated(
     .fetch_all(db)
     .await?;
 
-    Ok(PaginatedMessages { messages, total_count })
+    // 4. Получаем список участников комнаты
+    let members = sqlx::query_as::<_, RoomMemberInfo>(
+        r#"
+        SELECT 
+            u.id,
+            u.username,
+            u.first_name,
+            u.last_name,
+            u.avatar_url,
+            rm.role::text as role
+        FROM room_members rm
+        JOIN users u ON rm.user_id = u.id
+        WHERE rm.room_id = $1
+        "#,
+    )
+    .bind(room_id)
+    .fetch_all(db)
+    .await?;
+
+    Ok(PaginatedMessages { messages, total_count, members })
 }
 

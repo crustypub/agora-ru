@@ -124,6 +124,7 @@ pub async fn get_room_messages(
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "success",
         "data": response,
+        "members": paginated.members,
         "meta": {
             "current_page": params.page,
             "per_page": limit,
