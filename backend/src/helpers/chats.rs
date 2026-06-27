@@ -462,13 +462,35 @@ pub async fn remove_room_member(
         }
     }
 
+    let mut tx = db.begin().await?;
+
     sqlx::query!(
         "DELETE FROM room_members WHERE room_id = $1 AND user_id = $2",
         room_id,
         target_user_id
     )
-    .execute(db)
+    .execute(&mut *tx)
     .await?;
+
+    // Проверяем количество оставшихся участников в этой комнате
+    let remaining_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) as \"count!\" FROM room_members WHERE room_id = $1",
+        room_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // Если участников не осталось, полностью удаляем комнату
+    if remaining_count == 0 {
+        sqlx::query!(
+            "DELETE FROM rooms WHERE id = $1",
+            room_id
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
 
     Ok(())
 }
