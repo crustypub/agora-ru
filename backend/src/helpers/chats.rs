@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 use actix_web::{ResponseError, HttpResponse, http::StatusCode};
 use std::fmt;
-use crate::models::chat::{WsMessage, SendMessagePayload, ReadRoomPayload, ChatListItem};
+use crate::models::chat::{WsMessage, SendMessagePayload, ReadRoomPayload, ChatListItem, ChatMessage};
 
 /// Кастомное перечисление ошибок для чат-системы.
 /// Реализует `ResponseError`, что позволяет автоматически преобразовывать ошибки
@@ -676,3 +676,96 @@ pub async fn ws_session_loop(
         senders.retain(|tx| !tx.is_closed());
     }
 }
+
+pub struct PaginatedMessages {
+    pub messages: Vec<ChatMessage>,
+    pub total_count: i64,
+}
+
+/// Получает историю сообщений конкретной комнаты с поддержкой поиска и пагинации.
+/// Перед получением проверяет, состоит ли пользователь в этой комнате.
+pub async fn get_room_messages_paginated(
+    db: &sqlx::PgPool,
+    user_id: Uuid,
+    room_id: Uuid,
+    limit: i64,
+    offset: i64,
+    search_pattern: Option<String>,
+) -> Result<PaginatedMessages, ChatError> {
+    // 1. Проверяем членство пользователя в комнате
+    let is_member = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2) as \"exists!\"",
+        room_id,
+        user_id
+    )
+    .fetch_one(db)
+    .await
+    .unwrap_or(false);
+
+    if !is_member {
+        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+    }
+
+    // 2. Считаем общее число сообщений (исключая удаленные для всех или скрытые для текущего юзера)
+    let total_count = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) as "count!"
+        FROM messages m
+        WHERE m.room_id = $1
+          AND m.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM deleted_messages dm
+              WHERE dm.message_id = m.id AND dm.user_id = $2
+          )
+          AND ($3::text IS NULL OR m.content ILIKE $3)
+        "#,
+        room_id,
+        user_id,
+        search_pattern
+    )
+    .fetch_one(db)
+    .await?;
+
+    // 3. Выбираем пагинированный список сообщений
+    let messages = sqlx::query_as::<_, ChatMessage>(
+        r#"
+        SELECT 
+            m.id,
+            m.room_id,
+            m.sender_id,
+            m.content,
+            EXTRACT(EPOCH FROM m.created_at)::BIGINT as created_at,
+            CASE 
+                WHEN m.sender_id IS NOT NULL THEN json_build_object(
+                    'id', u.id,
+                    'username', u.username,
+                    'first_name', u.first_name,
+                    'last_name', u.last_name,
+                    'avatar_url', u.avatar_url
+                )
+                ELSE NULL
+            END as author
+        FROM messages m
+        LEFT JOIN users u ON m.sender_id = u.id
+        WHERE m.room_id = $1
+          AND m.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM deleted_messages dm
+              WHERE dm.message_id = m.id AND dm.user_id = $2
+          )
+          AND ($3::text IS NULL OR m.content ILIKE $3)
+        ORDER BY m.created_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(room_id)
+    .bind(user_id)
+    .bind(search_pattern)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(db)
+    .await?;
+
+    Ok(PaginatedMessages { messages, total_count })
+}
+

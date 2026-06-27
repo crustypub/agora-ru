@@ -9,6 +9,7 @@ use crate::{
         chat::{
             AddMemberRequest, ChatRoomType, CreateChatRoomRequest, DeleteMessageQuery,
             MessageDeletedNotification, RoomsParams, WsMessage, ChatListItemResponse,
+            ChatMessageResponse,
         },
     },
     helpers::chats::ChatError,
@@ -77,6 +78,68 @@ pub async fn get_rooms(
         }
     })))
 }
+
+/// Получает историю сообщений конкретного чата с поддержкой поиска, лимита и офсета.
+#[get("/chats/{room_id}")]
+pub async fn get_room_messages(
+    user: AuthenticatedUser,
+    room_id: web::Path<Uuid>,
+    params: web::Query<RoomsParams>,
+    state: web::Data<AppState>,
+) -> Result<impl Responder, ChatError> {
+    let user_id = user.id;
+    let room_id = room_id.into_inner();
+    let limit = params.limit;
+
+    // Подготовка ILIKE-паттерна для поиска сообщений
+    let search_pattern = params
+        .search_value
+        .as_ref()
+        .map(|val| format!("%{}%", val.trim()));
+
+    // Загрузка истории сообщений чата через хелпер
+    let paginated = crate::helpers::chats::get_room_messages_paginated(
+        &state.pool,
+        user_id,
+        room_id,
+        limit,
+        params.offset(),
+        search_pattern,
+    )
+    .await?;
+
+    let total_pages = (paginated.total_count as f64 / limit as f64).ceil() as i64;
+
+    // Приведение к ответной структуре с разворачиванием sqlx JSON-полей
+    let response: Vec<ChatMessageResponse> = paginated
+        .messages
+        .into_iter()
+        .map(|msg| {
+            ChatMessageResponse {
+                id: msg.id,
+                room_id: msg.room_id,
+                sender_id: msg.sender_id,
+                content: msg.content,
+                created_at: msg.created_at,
+                author: msg.author.map(|j| j.0),
+            }
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "data": response,
+        "meta": {
+            "current_page": params.page,
+            "per_page": limit,
+            "total_count": paginated.total_count,
+            "total_pages": total_pages,
+            "has_next": params.page < total_pages,
+            "has_previous": params.page > 1
+        }
+    })))
+}
+
 
 /// Создает новую комнату.
 /// Поддерживает создание как личных (direct), так и групповых (group) чатов.

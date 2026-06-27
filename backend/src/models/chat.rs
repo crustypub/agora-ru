@@ -37,16 +37,6 @@ impl RoomsParams {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LastMessage {
-    pub id: Uuid,
-    pub room_id: Uuid,
-    pub sender_id: Option<Uuid>,
-    pub content: String,
-    pub created_at: i64,
-    pub author: Option<Json<Author>>,
-}
-
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct ChatListItem {
     pub id: Uuid,
@@ -57,7 +47,7 @@ pub struct ChatListItem {
     pub created_at: i64,
     pub updated_at: i64,
     pub unread_count: i64,
-    pub last_message: Option<Json<LastMessage>>,
+    pub last_message: Option<Json<ChatMessage>>,
     pub direct_user: Option<Json<Author>>,
 }
 
@@ -71,7 +61,7 @@ pub struct ChatListItemResponse {
     pub created_at: i64,
     pub updated_at: i64,
     pub unread_count: i64,
-    pub last_message: Option<LastMessage>,
+    pub last_message: Option<ChatMessage>,
     pub direct_user: Option<Author>,
 }
 
@@ -112,6 +102,27 @@ pub struct MessageDeletedNotification {
     pub message_id: Uuid,
     pub room_id: Uuid,
 }
+
+#[derive(Debug, sqlx::FromRow, Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub sender_id: Option<Uuid>,
+    pub content: String,
+    pub created_at: i64,
+    pub author: Option<Json<Author>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatMessageResponse {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub sender_id: Option<Uuid>,
+    pub content: String,
+    pub created_at: i64,
+    pub author: Option<Json<Author>>,
+}
+
 
 type Tx = mpsc::UnboundedSender<WsMessage>;
 

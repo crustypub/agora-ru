@@ -18,7 +18,7 @@ use models::app::AppState;
 use crate::{handlers::{chats::get_rooms, user::{delete_avatar, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}}, models::chat::ChatServerState};
 use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get_comments};
 use crate::handlers::chats_ws::chat_ws_route;
-use crate::handlers::chats::{create_room, add_member, remove_member, delete_message};
+use crate::handlers::chats::{create_room, add_member, remove_member, delete_message, get_room_messages};
 
 
 #[actix_web::main]
@@ -109,6 +109,7 @@ async fn main() -> std::io::Result<()> {
                 .service(chat_ws_route)
                 .service(create_room)
                 .service(get_rooms)
+                .service(get_room_messages)
                 .service(add_member)
                 .service(remove_member)
                 .service(delete_message)
