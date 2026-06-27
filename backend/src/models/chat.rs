@@ -120,7 +120,7 @@ pub struct ChatMessageResponse {
     pub sender_id: Option<Uuid>,
     pub content: String,
     pub created_at: i64,
-    pub author: Option<Json<Author>>,
+    pub author: Option<Author>,
 }
 
 
