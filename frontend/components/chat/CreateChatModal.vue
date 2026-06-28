@@ -1,7 +1,6 @@
 <template>
   <UModal v-model:open="isOpen" title="Создать чат">
     <template #body>
-      <!-- Mode Selection Tab Buttons -->
       <div class="create-chat-modal__tabs">
         <UButton
           :variant="activeTab === 'direct' ? 'solid' : 'ghost'"
@@ -19,22 +18,29 @@
         />
       </div>
 
-      <!-- Direct Chat Creation -->
       <div v-if="activeTab === 'direct'" class="create-chat-modal__form">
         <p class="create-chat-modal__hint">
-          Введите UUID или имя пользователя, чтобы начать диалог.
+          Выберите пользователя из списка по имени или username, чтобы начать диалог.
         </p>
-        <UFormField label="ID или username пользователя" required>
-          <UInput
-            v-model="directUserId"
-            placeholder="Например, a3b4c5d6..."
-            autofocus
-            @keyup.enter="handleCreateDirect"
-          />
+        <UFormField label="Пользователь" required>
+          <USelectMenu
+            v-model="selectedUser"
+            v-model:search-term="searchTerm"
+            :items="usersItems"
+            :loading="searchLoading"
+            :ignore-filter="true"
+            placeholder="Введите не менее 3-х символов для поиска..."
+            option-attribute="label"
+            :search-input="{ placeholder: 'Поиск...' }"
+            class="w-full"
+          >
+            <template #empty>
+              Пользователи не найдены
+            </template>
+          </USelectMenu>
         </UFormField>
       </div>
 
-      <!-- Group Chat Creation -->
       <div v-else class="create-chat-modal__form">
         <p class="create-chat-modal__hint">
           Создайте новую группу для обсуждения проектов и новостей.
@@ -55,7 +61,6 @@
         </UFormField>
       </div>
 
-      <!-- Error alert -->
       <div v-if="errorMessage" class="create-chat-modal__error">
         {{ errorMessage }}
       </div>
@@ -74,7 +79,7 @@
           color="primary"
           label="Начать диалог"
           :loading="submitting"
-          :disabled="!directUserId.trim()"
+          :disabled="!selectedUser"
           @click="handleCreateDirect"
         />
         <UButton
@@ -91,9 +96,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useChat } from '~/composables/useChat';
 import { useNotify } from '~/composables/useNotify';
+
+import { useApiCall } from '~/composables/useApi';
+import { debounce } from 'lodash-es';
 
 const props = defineProps<{
   open: boolean;
@@ -115,22 +123,73 @@ const activeTab = ref<'direct' | 'group'>('direct');
 const submitting = ref(false);
 const errorMessage = ref('');
 
-// Form fields
-const directUserId = ref('');
+const selectedUser = ref<{ id: string; label: string; avatar?: { src: string; alt?: string } } | null>(null);
+const usersItems = ref<{ id: string; label: string; avatar?: { src: string; alt?: string } }[]>([]);
+const searchTerm = ref('');
+const searchLoading = ref(false);
 const groupName = ref('');
 const groupDescription = ref('');
 
+const debouncedSearchUsers = debounce(async (query: string) => {
+  const trimmed = query.trim();
+  if (trimmed.length < 3) {
+    usersItems.value = [];
+    return;
+  }
+  searchLoading.value = true;
+  try {
+    const res = await useApiCall<{ data: any[] }>('/api/users', {
+      query: { search_value: trimmed, limit: 5 }
+    });
+    const rawData = res.data || [];
+    const items = rawData.map((u: any) => {
+      const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'Без имени';
+      const usernameSuffix = u.username ? ` (@${u.username})` : '';
+      return {
+        id: u.id,
+        label: `${name}${usernameSuffix}`,
+        avatar: {
+          src: u.avatar_url || '',
+          alt: name
+        }
+      };
+    });
+    // Сохраняем текущего выбранного пользователя в списке
+    if (selectedUser.value && !items.some(item => item.id === selectedUser.value?.id)) {
+      items.push(selectedUser.value);
+    }
+    usersItems.value = items;
+  } catch (err) {
+    console.error('Failed to search users:', err);
+    usersItems.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+}, 300);
+
+watch(searchTerm, (newVal) => {
+  debouncedSearchUsers(newVal);
+});
+
+watch(() => props.open, (newVal) => {
+  if (newVal) {
+    selectedUser.value = null;
+    usersItems.value = [];
+    searchTerm.value = '';
+  }
+});
+
 const handleCreateDirect = async () => {
-  if (!directUserId.value.trim()) return;
+  if (!selectedUser.value) return;
   submitting.value = true;
   errorMessage.value = '';
   
-  const result = await createDirectChat(directUserId.value.trim());
+  const result = await createDirectChat(selectedUser.value.id);
   submitting.value = false;
   
   if (result.success) {
     notify.success('Чат создан', 'Вы можете начать общение.');
-    directUserId.value = '';
+    selectedUser.value = null;
     isOpen.value = false;
   } else {
     errorMessage.value = result.error || 'Не удалось создать чат. Проверьте правильность ID/username пользователя.';

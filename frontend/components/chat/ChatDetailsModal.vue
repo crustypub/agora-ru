@@ -46,19 +46,28 @@
         <div v-if="isOwnerOrModerator" class="chat-details__section">
           <span class="chat-details__section-title">Добавить участника</span>
           <div class="chat-details__input-group">
-            <UInput
-              v-model="newMemberId"
-              placeholder="UUID или username пользователя"
-              class="chat-details__input-field"
+            <USelectMenu
+              v-model="selectedUser"
+              v-model:search-term="searchTerm"
+              :items="usersItems"
+              :loading="searchLoading"
+              :ignore-filter="true"
+              placeholder="Введите имя, фамилию или @username..."
+              option-attribute="label"
+              :search-input="{ placeholder: 'Поиск...' }"
+              class="chat-details__input-field w-full"
               size="sm"
-              @keyup.enter="handleAddMember"
-            />
+            >
+              <template #empty>
+                Пользователи не найдены
+              </template>
+            </USelectMenu>
             <UButton
               label="Добавить"
               color="primary"
               size="sm"
               :loading="addingMember"
-              :disabled="!newMemberId.trim()"
+              :disabled="!selectedUser"
               @click="handleAddMember"
             />
           </div>
@@ -152,6 +161,9 @@ import { useNotify } from '~/composables/useNotify';
 import type { IRoomMemberInfo, IChatListItem } from '~/models/entities/chat.entities';
 import { formatUserName } from '~/helpers/chat';
 
+import { useApiCall } from '~/composables/useApi';
+import { debounce } from 'lodash-es';
+
 const props = defineProps<{
   open: boolean;
   room: IChatListItem | null;
@@ -171,12 +183,58 @@ const { members, inviteMember, kickMember, leaveRoom } = useChat();
 const notify = useNotify();
 
 const addingMember = ref(false);
-const newMemberId = ref('');
+const selectedUser = ref<{ id: string; label: string; avatar?: { src: string; alt?: string } } | null>(null);
+const usersItems = ref<{ id: string; label: string; avatar?: { src: string; alt?: string } }[]>([]);
+const searchTerm = ref('');
+const searchLoading = ref(false);
 const leaving = ref(false);
+
+const debouncedSearchUsers = debounce(async (query: string) => {
+  const trimmed = query.trim();
+  if (trimmed.length < 3) {
+    usersItems.value = [];
+    return;
+  }
+  searchLoading.value = true;
+  try {
+    const res = await useApiCall<{ data: any[] }>('/api/users', {
+      query: { search_value: trimmed, limit: 5 }
+    });
+    const rawData = res.data || [];
+    const items = rawData.map((u: any) => {
+      const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'Без имени';
+      const usernameSuffix = u.username ? ` (@${u.username})` : '';
+      return {
+        id: u.id,
+        label: `${name}${usernameSuffix}`,
+        avatar: {
+          src: u.avatar_url || '',
+          alt: name
+        }
+      };
+    });
+    // Сохраняем текущего выбранного пользователя в списке
+    if (selectedUser.value && !items.some(item => item.id === selectedUser.value?.id)) {
+      items.push(selectedUser.value);
+    }
+    usersItems.value = items;
+  } catch (err) {
+    console.error('Failed to search users:', err);
+    usersItems.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+}, 300);
+
+watch(searchTerm, (newVal) => {
+  debouncedSearchUsers(newVal);
+});
 
 // Сбрасываем поле ввода при закрытии модалки или смене комнаты
 watch([() => props.open, () => props.room?.id], () => {
-  newMemberId.value = '';
+  selectedUser.value = null;
+  usersItems.value = [];
+  searchTerm.value = '';
 });
 
 const isDirect = computed(() => props.room?.room_type === 'direct');
@@ -225,15 +283,15 @@ const getRoleColor = (role: string) => {
 };
 
 const handleAddMember = async () => {
-  if (!props.room || !newMemberId.value.trim()) return;
+  if (!props.room || !selectedUser.value) return;
   addingMember.value = true;
   
-  const result = await inviteMember(props.room.id, newMemberId.value.trim());
+  const result = await inviteMember(props.room.id, selectedUser.value.id);
   addingMember.value = false;
   
   if (result.success) {
     notify.success('Участник добавлен');
-    newMemberId.value = '';
+    selectedUser.value = null;
   } else {
     notify.error('Ошибка добавления', result.error || 'Проверьте правильность UUID/username.');
   }
