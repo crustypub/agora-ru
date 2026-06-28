@@ -26,7 +26,7 @@ pub async fn get_users(
         r#"
         SELECT
             u.id, u.username, 
-            u.first_name, u.last_name
+            u.first_name, u.last_name, u.avatar_url
         FROM users u
         WHERE ($3::text IS NULL OR 
                u.username ILIKE $3 ESCAPE '\' OR 
