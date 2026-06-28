@@ -1,8 +1,6 @@
 use crate::{
-    helpers::{api::{AuthenticatedUser, escape_like_pattern}, images},
-    models::{
-        app::AppState,
-        user::{GetUsersParams, UpdateUserInfoRequest, User, ShortUser},
+    helpers::{api::AuthenticatedUser, images}, models::{
+        app::AppState, user::{GetUsersParams, UpdateUserInfoRequest, User},
     },
 };
 use actix_multipart::Multipart;
@@ -17,44 +15,24 @@ pub async fn get_users(
     let limit = params.limit;
     let offset = params.offset();
 
-    let search_pattern = params
-        .search_value
-        .as_ref()
-        .map(|val| format!("%{}%", escape_like_pattern(val.trim())));
-
-    let users_result = sqlx::query_as::<_, ShortUser>(
+    let users_result = sqlx::query_as::<_, User>(
         r#"
         SELECT
             u.id, u.username, 
             u.first_name, u.last_name
         FROM users u
-        WHERE ($3::text IS NULL OR 
-               u.username ILIKE $3 ESCAPE '\' OR 
-               u.first_name ILIKE $3 ESCAPE '\' OR 
-               u.last_name ILIKE $3 ESCAPE '\')
         ORDER BY u.username DESC
         LIMIT $1 OFFSET $2
         "#,
     )
     .bind(limit)
     .bind(offset)
-    .bind(&search_pattern)
     .fetch_all(&state.pool)
     .await;
 
-    let count_result = sqlx::query_scalar::<_, i64>(
-        r#"
-        SELECT COUNT(*) 
-        FROM users u
-        WHERE ($1::text IS NULL OR 
-               u.username ILIKE $1 ESCAPE '\' OR 
-               u.first_name ILIKE $1 ESCAPE '\' OR 
-               u.last_name ILIKE $1 ESCAPE '\')
-        "#,
-    )
-    .bind(&search_pattern)
-    .fetch_one(&state.pool)
-    .await;
+    let count_result = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+        .fetch_one(&state.pool)
+        .await;
 
     match (users_result, count_result) {
         (Ok(users), Ok(total_count)) => {
