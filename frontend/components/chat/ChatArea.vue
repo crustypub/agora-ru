@@ -460,13 +460,14 @@ const handleEnterKey = (e: KeyboardEvent) => {
   }
 
   &__date-text {
-    padding: 0.125rem 0.5rem;
-    font-size: 0.625rem;
-    font-weight: 500;
-    color: var(--ui-text-muted);
-    background-color: var(--ui-bg-muted);
-    border: 1px solid rgba(var(--ui-border), 0.5);
-    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ui-text-highlighted);
+    background-color: var(--ui-bg-elevated);
+    border: 1px solid var(--ui-border);
+    border-radius: 0;
+    letter-spacing: 0.02em;
   }
 
   &__input-bar {

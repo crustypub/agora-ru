@@ -158,7 +158,7 @@ const copyText = async () => {
   &__sender-name {
     font-size: 0.625rem;
     font-weight: 600;
-    color: var(--ui-text-muted);
+    color: var(--color-greek-blue-500);
     margin-left: 0.5rem;
   }
 
@@ -170,14 +170,13 @@ const copyText = async () => {
     user-select: text;
     white-space: pre-wrap;
     word-break: break-word;
-    min-width: 80px;
+    min-width: 120px;
     max-width: 100%;
 
     &--me {
-      background-color: var(--ui-primary-subtle);
-      color: var(--ui-text-highlighted);
       border-bottom-right-radius: 0;
-      border: 1px solid rgba(var(--ui-primary), 0.2);
+      background-color: var(--color-greek-blue-500);
+      color: #fff;
     }
 
     &--other {
@@ -222,10 +221,17 @@ const copyText = async () => {
     gap: 0.25rem;
     margin-top: 0.25rem;
     font-size: 0.625rem;
-    color: rgba(var(--ui-text-muted), 0.8);
     text-align: right;
     line-height: 1;
     user-select: none;
+
+    .message-item__bubble--me & {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .message-item__bubble--other & {
+      color: var(--ui-text-muted);
+    }
   }
 }
 </style>
