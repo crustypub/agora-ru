@@ -3,7 +3,6 @@
     class="message-item"
     :class="isMe ? 'message-item--me' : 'message-item--other'"
   >
-    <!-- Sender Avatar (Only in groups for other members) -->
     <UAvatar
       v-if="isGroup && !isMe"
       :src="message.author?.avatar_url || ''"
@@ -16,9 +15,7 @@
       </template>
     </UAvatar>
 
-    <!-- Message bubble and content -->
     <div class="message-item__body">
-      <!-- Sender Name (Only in groups for other members) -->
       <span 
         v-if="isGroup && !isMe" 
         class="message-item__sender-name"
@@ -26,12 +23,10 @@
         {{ senderName }}
       </span>
 
-      <!-- Bubble content -->
       <div 
         class="message-item__bubble group"
         :class="isMe ? 'message-item__bubble--me' : 'message-item__bubble--other'"
       >
-        <!-- Dropdown Menu Actions -->
         <div class="message-item__actions">
           <UDropdownMenu :items="dropdownItems" :popper="{ placement: 'bottom-end' }">
             <UButton 
@@ -44,14 +39,17 @@
           </UDropdownMenu>
         </div>
 
-        <!-- Content -->
         <div class="message-item__text">
           {{ message.content }}
         </div>
 
-        <!-- Timestamp & status info -->
         <div class="message-item__time-wrapper">
           <span>{{ formattedTime }}</span>
+          <UIcon 
+            v-if="isMe"
+            :name="message.is_read ? 'material-symbols:done-all' : 'material-symbols:done'"
+            class="message-item__status-icon"
+          />
         </div>
       </div>
     </div>
@@ -232,6 +230,12 @@ const copyText = async () => {
     .message-item__bubble--other & {
       color: var(--ui-text-muted);
     }
+  }
+
+  &__status-icon {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    color: inherit;
   }
 }
 </style>

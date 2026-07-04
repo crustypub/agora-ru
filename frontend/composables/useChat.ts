@@ -195,6 +195,27 @@ export const useChat = () => {
         fetchRooms(1, true);
         break;
       }
+
+      case 'room_read': {
+        const { room_id, user_id, last_read_at } = msg.payload;
+        
+        const msgs = messagesStore.value[room_id];
+        if (msgs) {
+          msgs.forEach(m => {
+            if (m.sender_id !== user_id && m.created_at <= last_read_at) {
+              m.is_read = true;
+            }
+          });
+        }
+        
+        const room = rooms.value.find(r => r.id === room_id);
+        if (room && room.last_message) {
+          if (room.last_message.sender_id !== user_id && room.last_message.created_at <= last_read_at) {
+            room.last_message.is_read = true;
+          }
+        }
+        break;
+      }
     }
   };
 

@@ -10,6 +10,7 @@ export interface IChatMessage {
   content: string;
   created_at: number; // Unix Epoch в секундах
   author: IUserResponse | null;
+  is_read?: boolean;
 }
 
 export interface IChatListItem {
@@ -60,4 +61,5 @@ export type WsOutgoingEvent =
 export type WsIncomingEvent =
   | { event: 'new_message'; payload: { id: string; room_id: string; sender_id: string; content: string; created_at: string } }
   | { event: 'message_deleted'; payload: { message_id: string; room_id: string } }
-  | { event: 'room_created'; payload: { room_id: string } };
+  | { event: 'room_created'; payload: { room_id: string } }
+  | { event: 'room_read'; payload: { room_id: string; user_id: string; last_read_at: number } };
