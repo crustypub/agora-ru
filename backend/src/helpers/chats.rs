@@ -1,11 +1,13 @@
+use crate::models::chat::{
+    ChatListItem, ChatMessage, ReadRoomPayload, RoomMemberInfo, SendMessagePayload, WsMessage,
+};
+use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use actix_ws::Message;
 use futures_util::StreamExt;
+use std::fmt;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use actix_web::{ResponseError, HttpResponse, http::StatusCode};
-use std::fmt;
-use crate::models::chat::{WsMessage, SendMessagePayload, ReadRoomPayload, ChatListItem, ChatMessage, RoomMemberInfo};
 
 /// Кастомное перечисление ошибок для чат-системы.
 /// Реализует `ResponseError`, что позволяет автоматически преобразовывать ошибки
@@ -73,7 +75,6 @@ pub struct PaginatedRooms {
     pub total_count: i64,
 }
 
-/// Получает пагинированный список комнат пользователя с поддержкой поиска.
 pub async fn get_user_rooms_paginated(
     db: &sqlx::PgPool,
     user_id: Uuid,
@@ -81,7 +82,6 @@ pub async fn get_user_rooms_paginated(
     offset: i64,
     search_pattern: Option<String>,
 ) -> Result<PaginatedRooms, ChatError> {
-    // 1. Считаем общее количество подходящих комнат для метаданных пагинации
     let total_count = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) as "count!"
@@ -112,7 +112,6 @@ pub async fn get_user_rooms_paginated(
     .fetch_one(db)
     .await?;
 
-    // 2. Получаем пагинированный список комнат вместе с последним сообщением и информацией о собеседнике
     let rooms = sqlx::query_as::<_, ChatListItem>(
         r#"
         SELECT
@@ -148,7 +147,25 @@ pub async fn get_user_rooms_paginated(
                         'first_name', u.first_name,
                         'last_name', u.last_name,
                         'avatar_url', u.avatar_url
-                    )
+                    ),
+                    'is_read', CASE
+                        WHEN m.sender_id = $1 THEN 
+                            EXISTS (
+                                SELECT 1 
+                                FROM room_members rm_other 
+                                WHERE rm_other.room_id = m.room_id 
+                                  AND rm_other.user_id != $1 
+                                  AND rm_other.last_read_at >= m.created_at
+                            )
+                        ELSE 
+                            EXISTS (
+                                SELECT 1 
+                                FROM room_members rm_self 
+                                WHERE rm_self.room_id = m.room_id 
+                                  AND rm_self.user_id = $1 
+                                  AND rm_self.last_read_at >= m.created_at
+                            )
+                    END
                 )
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
@@ -223,15 +240,15 @@ pub async fn get_user_rooms_paginated(
     Ok(PaginatedRooms { rooms, total_count })
 }
 
-/// Создает личную комнату (direct chat) между двумя пользователями.
-/// Возвращает UUID комнаты и флаг `already_exists`, если комната была создана ранее.
 pub async fn create_direct_room(
     db: &sqlx::PgPool,
     author_id: Uuid,
     user_2: Uuid,
 ) -> Result<(Uuid, bool), ChatError> {
     if author_id == user_2 {
-        return Err(ChatError::BadRequest("Cannot create direct chat with yourself".to_string()));
+        return Err(ChatError::BadRequest(
+            "Cannot create direct chat with yourself".to_string(),
+        ));
     }
 
     // Алфавитный ключ для уникальности переписки двух пользователей
@@ -243,12 +260,10 @@ pub async fn create_direct_room(
     let direct_key = format!("{}:{}", min_user, max_user);
 
     // Проверяем, существует ли уже такой чат
-    let existing_room = sqlx::query_scalar!(
-        "SELECT id FROM rooms WHERE direct_key = $1",
-        direct_key
-    )
-    .fetch_optional(db)
-    .await?;
+    let existing_room =
+        sqlx::query_scalar!("SELECT id FROM rooms WHERE direct_key = $1", direct_key)
+            .fetch_optional(db)
+            .await?;
 
     if let Some(room_id) = existing_room {
         return Ok((room_id, true));
@@ -344,14 +359,12 @@ pub async fn create_group_room(
     Ok(room_id)
 }
 
-/// Добавляет нового участника в групповой чат, проверяя права запрашивающего.
 pub async fn add_room_member(
     db: &sqlx::PgPool,
     requester_id: Uuid,
     room_id: Uuid,
     target_user_id: Uuid,
 ) -> Result<(), ChatError> {
-    // 1. Проверяем тип комнаты и роль запрашивающего
     let room_info = sqlx::query!(
         r#"
         SELECT type::text as room_type,
@@ -367,7 +380,9 @@ pub async fn add_room_member(
     let info = room_info.ok_or_else(|| ChatError::NotFound("Room not found".to_string()))?;
 
     if info.room_type.as_deref() == Some("direct") {
-        return Err(ChatError::BadRequest("Cannot add members to direct chats".to_string()));
+        return Err(ChatError::BadRequest(
+            "Cannot add members to direct chats".to_string(),
+        ));
     }
 
     let role = info.requester_role.ok_or_else(|| {
@@ -376,10 +391,11 @@ pub async fn add_room_member(
 
     // Приглашать могут только владельцы и модераторы
     if role != "owner" && role != "moderator" {
-        return Err(ChatError::Forbidden("You do not have permission to invite members (must be owner or moderator)".to_string()));
+        return Err(ChatError::Forbidden(
+            "You do not have permission to invite members (must be owner or moderator)".to_string(),
+        ));
     }
 
-    // 2. Проверяем существование приглашаемого пользователя
     let user_exists = sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) as \"exists!\"",
         target_user_id
@@ -392,7 +408,6 @@ pub async fn add_room_member(
         return Err(ChatError::NotFound("User to invite not found".to_string()));
     }
 
-    // 3. Добавляем в участники
     let result = sqlx::query!(
         r#"
         INSERT INTO room_members (room_id, user_id, role)
@@ -407,13 +422,14 @@ pub async fn add_room_member(
     .await?;
 
     if result.rows_affected() == 0 {
-        Err(ChatError::Conflict("User is already a member of this room".to_string()))
+        Err(ChatError::Conflict(
+            "User is already a member of this room".to_string(),
+        ))
     } else {
         Ok(())
     }
 }
 
-/// Удаляет участника из группового чата (кик или самостоятельный выход), проверяя права.
 pub async fn remove_room_member(
     db: &sqlx::PgPool,
     requester_id: Uuid,
@@ -435,10 +451,13 @@ pub async fn remove_room_member(
     .fetch_optional(db)
     .await?;
 
-    let roles_info = roles.ok_or_else(|| ChatError::NotFound("Room or member information not found".to_string()))?;
+    let roles_info = roles
+        .ok_or_else(|| ChatError::NotFound("Room or member information not found".to_string()))?;
 
     if roles_info.room_type.as_deref() == Some("direct") {
-        return Err(ChatError::BadRequest("Cannot modify members in direct chats".to_string()));
+        return Err(ChatError::BadRequest(
+            "Cannot modify members in direct chats".to_string(),
+        ));
     }
 
     let req_role = roles_info.requester_role.ok_or_else(|| {
@@ -452,13 +471,19 @@ pub async fn remove_room_member(
     // Если это принудительный кик (а не самостоятельный выход), проверяем иерархию прав
     if requester_id != target_user_id {
         if req_role == "member" {
-            return Err(ChatError::Forbidden("Members cannot kick other users".to_string()));
+            return Err(ChatError::Forbidden(
+                "Members cannot kick other users".to_string(),
+            ));
         }
         if req_role == "moderator" && tgt_role != "member" {
-            return Err(ChatError::Forbidden("Moderators can only kick regular members".to_string()));
+            return Err(ChatError::Forbidden(
+                "Moderators can only kick regular members".to_string(),
+            ));
         }
         if tgt_role == "owner" {
-            return Err(ChatError::Forbidden("Cannot kick the owner of the room".to_string()));
+            return Err(ChatError::Forbidden(
+                "Cannot kick the owner of the room".to_string(),
+            ));
         }
     }
 
@@ -482,12 +507,9 @@ pub async fn remove_room_member(
 
     // Если участников не осталось, полностью удаляем комнату
     if remaining_count == 0 {
-        sqlx::query!(
-            "DELETE FROM rooms WHERE id = $1",
-            room_id
-        )
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query!("DELETE FROM rooms WHERE id = $1", room_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     tx.commit().await?;
@@ -508,7 +530,9 @@ pub async fn delete_chat_message(
     delete_type: &str,
 ) -> Result<MessageDeletionResult, ChatError> {
     if delete_type != "me" && delete_type != "everyone" {
-        return Err(ChatError::BadRequest("Invalid delete type. Must be 'me' or 'everyone'".to_string()));
+        return Err(ChatError::BadRequest(
+            "Invalid delete type. Must be 'me' or 'everyone'".to_string(),
+        ));
     }
 
     // Проверяем существование сообщения, автора, роль запрашивающего и членство в комнате
@@ -531,7 +555,9 @@ pub async fn delete_chat_message(
     let msg_info = msg_info.ok_or_else(|| ChatError::NotFound("Message not found".to_string()))?;
 
     if !msg_info.is_member {
-        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+        return Err(ChatError::Forbidden(
+            "You do not have access to this room".to_string(),
+        ));
     }
 
     if delete_type == "everyone" {
@@ -541,7 +567,9 @@ pub async fn delete_chat_message(
 
         // Удалять сообщения "у всех" могут только автор сообщения или владелец/модератор
         if !is_author && !is_privileged {
-            return Err(ChatError::Forbidden("You do not have permission to delete this message for everyone".to_string()));
+            return Err(ChatError::Forbidden(
+                "You do not have permission to delete this message for everyone".to_string(),
+            ));
         }
 
         sqlx::query!(
@@ -551,7 +579,9 @@ pub async fn delete_chat_message(
         .execute(db)
         .await?;
 
-        Ok(MessageDeletionResult::EveryoneDeleted { room_id: msg_info.room_id })
+        Ok(MessageDeletionResult::EveryoneDeleted {
+            room_id: msg_info.room_id,
+        })
     } else {
         // Удаление "для себя" — просто скрываем сообщение в локальной таблице скрытых сообщений
         sqlx::query!(
@@ -592,21 +622,28 @@ pub async fn handle_incoming_event(
                 // Сохраняем сообщение в базу данных PostgreSQL через SQLx
                 let msg_id = Uuid::new_v4();
                 let created_at = chrono::Utc::now();
-                
+
                 let db_result = sqlx::query!(
                     "INSERT INTO messages (id, room_id, sender_id, content, created_at) 
                      VALUES ($1, $2, $3, $4, $5)",
-                    msg_id, payload.room_id, sender_id, payload.content, created_at
+                    msg_id,
+                    payload.room_id,
+                    sender_id,
+                    payload.content,
+                    created_at
                 )
-                .execute(db).await;
+                .execute(db)
+                .await;
 
                 if db_result.is_ok() {
                     // 3. Достаем из БД список всех участников этой комнаты, чтобы знать, кому слать уведомление
                     if let Ok(members) = sqlx::query!(
                         "SELECT user_id FROM room_members WHERE room_id = $1",
                         payload.room_id
-                    ).fetch_all(db).await {
-
+                    )
+                    .fetch_all(db)
+                    .await
+                    {
                         // Подготавливаем красивый JSON для фронта
                         let notification = crate::models::chat::NewMessageNotification {
                             id: msg_id,
@@ -632,12 +669,33 @@ pub async fn handle_incoming_event(
 
         "read_room" => {
             if let Ok(payload) = serde_json::from_value::<ReadRoomPayload>(msg.payload.clone()) {
-                // Обновляем метку времени прочтения в БД
-                let _ = sqlx::query!(
-                    "UPDATE room_members SET last_read_at = NOW() WHERE room_id = $1 AND user_id = $2",
+                if let Ok(record) = sqlx::query!(
+                    "UPDATE room_members SET last_read_at = NOW() 
+                     WHERE room_id = $1 AND user_id = $2
+                     RETURNING EXTRACT(EPOCH FROM last_read_at)::BIGINT as \"last_read_at!\"",
                     payload.room_id, sender_id
                 )
-                .execute(db).await;
+                .fetch_one(db).await {
+                    if let Ok(members) = sqlx::query!(
+                        "SELECT user_id FROM room_members WHERE room_id = $1 AND user_id != $2",
+                        payload.room_id, sender_id
+                    )
+                    .fetch_all(db)
+                    .await {
+                        let out_msg = WsMessage {
+                            event: "room_read".to_string(),
+                            payload: serde_json::json!({
+                                "room_id": payload.room_id,
+                                "user_id": sender_id,
+                                "last_read_at": record.last_read_at
+                            }),
+                        };
+
+                        for member in members {
+                            chat_server.send_to_user(&member.user_id, out_msg.clone());
+                        }
+                    }
+                }
             }
         }
 
@@ -705,8 +763,6 @@ pub struct PaginatedMessages {
     pub members: Vec<RoomMemberInfo>,
 }
 
-/// Получает историю сообщений конкретной комнаты с поддержкой поиска и пагинации.
-/// Перед получением проверяет, состоит ли пользователь в этой комнате.
 pub async fn get_room_messages_paginated(
     db: &sqlx::PgPool,
     user_id: Uuid,
@@ -715,7 +771,6 @@ pub async fn get_room_messages_paginated(
     offset: i64,
     search_pattern: Option<String>,
 ) -> Result<PaginatedMessages, ChatError> {
-    // 1. Проверяем членство пользователя в комнате
     let is_member = sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2) as \"exists!\"",
         room_id,
@@ -726,10 +781,11 @@ pub async fn get_room_messages_paginated(
     .unwrap_or(false);
 
     if !is_member {
-        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+        return Err(ChatError::Forbidden(
+            "You do not have access to this room".to_string(),
+        ));
     }
 
-    // 2. Считаем общее число сообщений (исключая удаленные для всех или скрытые для текущего юзера)
     let total_count = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) as "count!"
@@ -749,7 +805,6 @@ pub async fn get_room_messages_paginated(
     .fetch_one(db)
     .await?;
 
-    // 3. Выбираем пагинированный список сообщений
     let messages = sqlx::query_as::<_, ChatMessage>(
         r#"
         SELECT 
@@ -767,7 +822,25 @@ pub async fn get_room_messages_paginated(
                     'avatar_url', u.avatar_url
                 )
                 ELSE NULL
-            END as author
+            END as author,
+            CASE
+                WHEN m.sender_id = $2 THEN
+                    EXISTS (
+                        SELECT 1
+                        FROM room_members rm_other
+                        WHERE rm_other.room_id = m.room_id
+                          AND rm_other.user_id != $2
+                          AND rm_other.last_read_at >= m.created_at
+                    )
+                ELSE
+                    EXISTS (
+                        SELECT 1
+                        FROM room_members rm_self
+                        WHERE rm_self.room_id = m.room_id
+                          AND rm_self.user_id = $2
+                          AND rm_self.last_read_at >= m.created_at
+                    )
+            END as is_read
         FROM messages m
         LEFT JOIN users u ON m.sender_id = u.id
         WHERE m.room_id = $1
@@ -789,7 +862,6 @@ pub async fn get_room_messages_paginated(
     .fetch_all(db)
     .await?;
 
-    // 4. Получаем список участников комнаты
     let members = sqlx::query_as::<_, RoomMemberInfo>(
         r#"
         SELECT 
@@ -808,6 +880,9 @@ pub async fn get_room_messages_paginated(
     .fetch_all(db)
     .await?;
 
-    Ok(PaginatedMessages { messages, total_count, members })
+    Ok(PaginatedMessages {
+        messages,
+        total_count,
+        members,
+    })
 }
-

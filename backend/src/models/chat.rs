@@ -111,6 +111,7 @@ pub struct ChatMessage {
     pub content: String,
     pub created_at: i64,
     pub author: Option<Json<Author>>,
+    pub is_read: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -121,6 +122,7 @@ pub struct ChatMessageResponse {
     pub content: String,
     pub created_at: i64,
     pub author: Option<Author>,
+    pub is_read: bool,
 }
 #[derive(Debug, sqlx::FromRow, Serialize, Deserialize, Clone)]
 pub struct RoomMemberInfo {

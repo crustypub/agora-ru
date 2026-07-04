@@ -10,8 +10,6 @@ use crate::{
     },
 };
 
-/// Получает пагинированный список чат-комнат пользователя.
-/// Поддерживает фильтрацию по поисковой строке `search_value`.
 #[get("/chats")]
 pub async fn get_rooms(
     user: AuthenticatedUser,
@@ -21,13 +19,11 @@ pub async fn get_rooms(
     let user_id = user.id;
     let limit = params.limit;
 
-    // Подготовка ILIKE-паттерна для поиска
     let search_pattern = params
         .search_value
         .as_ref()
         .map(|val| format!("%{}%", val.trim()));
 
-    // Загрузка комнат из БД
     let paginated = crate::helpers::chats::get_user_rooms_paginated(
         &state.pool,
         user_id,
@@ -39,7 +35,6 @@ pub async fn get_rooms(
 
     let total_pages = (paginated.total_count as f64 / limit as f64).ceil() as i64;
 
-    // Приведение к ответной структуре с разворачиванием sqlx JSON полей
     let response: Vec<ChatListItemResponse> = paginated
         .rooms
         .into_iter()
@@ -117,6 +112,7 @@ pub async fn get_room_messages(
                 content: msg.content,
                 created_at: msg.created_at,
                 author: msg.author.map(|j| j.0),
+                is_read: msg.is_read,
             }
         })
         .collect();
