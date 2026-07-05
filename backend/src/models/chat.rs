@@ -77,10 +77,19 @@ pub struct WsMessage {
     pub payload: Value,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SendMessageAttachment {
+    pub file_key: String,
+    pub file_name: String,
+    pub file_size: i64,
+    pub file_mime: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SendMessagePayload {
     pub room_id: Uuid,
     pub content: String,
+    pub attachments: Option<Vec<SendMessageAttachment>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -95,6 +104,7 @@ pub struct NewMessageNotification {
     pub sender_id: Option<Uuid>,
     pub content: String,
     pub created_at: DateTime<Utc>,
+    pub attachments: Option<Vec<AttachmentResponse>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -112,6 +122,8 @@ pub struct ChatMessage {
     pub created_at: i64,
     pub author: Option<Json<Author>>,
     pub is_read: bool,
+    #[sqlx(skip)]
+    pub attachments: Option<Vec<AttachmentResponse>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -123,6 +135,7 @@ pub struct ChatMessageResponse {
     pub created_at: i64,
     pub author: Option<Author>,
     pub is_read: bool,
+    pub attachments: Option<Vec<AttachmentResponse>>,
 }
 #[derive(Debug, sqlx::FromRow, Serialize, Deserialize, Clone)]
 pub struct RoomMemberInfo {
@@ -177,3 +190,11 @@ pub struct DeleteMessageQuery {
     pub delete_type: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AttachmentResponse {
+    pub id: Uuid,
+    pub file_name: String,
+    pub file_size: i64,
+    pub file_mime: String,
+    pub file_url: String, 
+}

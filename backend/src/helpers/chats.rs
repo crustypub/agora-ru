@@ -1,5 +1,5 @@
 use crate::models::chat::{
-    ChatListItem, ChatMessage, ReadRoomPayload, RoomMemberInfo, SendMessagePayload, WsMessage,
+    AttachmentResponse, ChatListItem, ChatMessage, ReadRoomPayload, RoomMemberInfo, SendMessagePayload, WsMessage,
 };
 use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use actix_ws::Message;
@@ -525,6 +525,7 @@ pub enum MessageDeletionResult {
 /// Удаляет сообщение для всех (soft delete) или только скрывает для конкретного пользователя.
 pub async fn delete_chat_message(
     db: &sqlx::PgPool,
+    s3_client: &aws_sdk_s3::Client,
     requester_id: Uuid,
     message_id: Uuid,
     delete_type: &str,
@@ -572,25 +573,110 @@ pub async fn delete_chat_message(
             ));
         }
 
+        let mut tx = db.begin().await?;
+
         sqlx::query!(
             "UPDATE messages SET deleted_at = NOW() WHERE id = $1",
             message_id
         )
-        .execute(db)
+        .execute(&mut *tx)
         .await?;
+
+        // Запрашиваем вложения, чтобы потом удалить их из S3
+        let attachments = sqlx::query!(
+            "SELECT file_key FROM message_attachments WHERE message_id = $1",
+            message_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+
+        // Удаляем вложения из базы данных
+        sqlx::query!(
+            "DELETE FROM message_attachments WHERE message_id = $1",
+            message_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        // Физическое удаление файлов из S3 (после фиксации транзакции)
+        let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+            .unwrap_or_else(|_| "chat-files".to_string());
+        for att in attachments {
+            let _ = s3_client
+                .delete_object()
+                .bucket(&bucket)
+                .key(&att.file_key)
+                .send()
+                .await;
+        }
 
         Ok(MessageDeletionResult::EveryoneDeleted {
             room_id: msg_info.room_id,
         })
     } else {
         // Удаление "для себя" — просто скрываем сообщение в локальной таблице скрытых сообщений
+        let mut tx = db.begin().await?;
+
         sqlx::query!(
             "INSERT INTO deleted_messages (message_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
             message_id,
             requester_id
         )
-        .execute(db)
+        .execute(&mut *tx)
         .await?;
+
+        let total_members = sqlx::query_scalar!(
+            "SELECT COUNT(*) as \"count!\" FROM room_members WHERE room_id = $1",
+            msg_info.room_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let deleted_by_count = sqlx::query_scalar!(
+            "SELECT COUNT(*) as \"count!\" FROM deleted_messages WHERE message_id = $1",
+            message_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let mut attachments_to_delete = Vec::new();
+        let mut fully_deleted = false;
+
+        // Если сообщение удалили все участники чата, полностью удаляем его из базы данных и S3
+        if deleted_by_count >= total_members {
+            fully_deleted = true;
+            let attachments = sqlx::query!(
+                "SELECT file_key FROM message_attachments WHERE message_id = $1",
+                message_id
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            attachments_to_delete = attachments.into_iter().map(|a| a.file_key).collect();
+
+            sqlx::query!(
+                "DELETE FROM messages WHERE id = $1",
+                message_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        if fully_deleted {
+            let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+                .unwrap_or_else(|_| "chat-files".to_string());
+            for key in attachments_to_delete {
+                let _ = s3_client
+                    .delete_object()
+                    .bucket(&bucket)
+                    .key(&key)
+                    .send()
+                    .await;
+            }
+        }
 
         Ok(MessageDeletionResult::MeDeleted)
     }
@@ -601,6 +687,7 @@ pub async fn handle_incoming_event(
     sender_id: &Uuid,
     chat_server: &crate::models::chat::ChatServerState,
     db: &sqlx::PgPool,
+    s3_client: &aws_sdk_s3::Client,
 ) {
     match msg.event.as_str() {
         "send_message" => {
@@ -619,9 +706,17 @@ pub async fn handle_incoming_event(
                     return;
                 }
 
-                // Сохраняем сообщение в базу данных PostgreSQL через SQLx
+                // Сохраняем сообщение и вложения в базу данных в рамках одной транзакции
                 let msg_id = Uuid::new_v4();
                 let created_at = chrono::Utc::now();
+
+                let mut tx = match db.begin().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("Failed to start transaction for message save: {:?}", e);
+                        return;
+                    }
+                };
 
                 let db_result = sqlx::query!(
                     "INSERT INTO messages (id, room_id, sender_id, content, created_at) 
@@ -632,11 +727,70 @@ pub async fn handle_incoming_event(
                     payload.content,
                     created_at
                 )
-                .execute(db)
+                .execute(&mut *tx)
                 .await;
 
-                if db_result.is_ok() {
-                    // 3. Достаем из БД список всех участников этой комнаты, чтобы знать, кому слать уведомление
+                if db_result.is_err() {
+                    let _ = tx.rollback().await;
+                    return;
+                }
+
+                let mut saved_attachments = Vec::new();
+                if let Some(attachments) = &payload.attachments {
+                    let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+                        .unwrap_or_else(|_| "chat-files".to_string());
+                    
+                    for att in attachments {
+                        let att_id = Uuid::new_v4();
+                        let insert_result = sqlx::query!(
+                            r#"
+                            INSERT INTO message_attachments (id, message_id, file_key, file_name, file_size, file_mime)
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                            "#,
+                            att_id,
+                            msg_id,
+                            att.file_key,
+                            att.file_name,
+                            att.file_size,
+                            att.file_mime
+                        )
+                        .execute(&mut *tx)
+                        .await;
+
+                        if let Err(e) = insert_result {
+                            eprintln!("Failed to insert message attachment: {:?}", e);
+                            let _ = tx.rollback().await;
+                            return;
+                        }
+
+                        // Сразу генерируем presigned URL для рассылки события клиентам
+                        let file_url = match crate::helpers::s3::get_presigned_download_url(
+                            s3_client,
+                            &bucket,
+                            &att.file_key,
+                            7200,
+                        )
+                        .await
+                        {
+                            Ok(url) => url,
+                            Err(e) => {
+                                eprintln!("Failed to generate presigned download URL for file_key {}: {:?}", att.file_key, e);
+                                format!("{}/{}", bucket, att.file_key)
+                            }
+                        };
+
+                        saved_attachments.push(AttachmentResponse {
+                            id: att_id,
+                            file_name: att.file_name.clone(),
+                            file_size: att.file_size,
+                            file_mime: att.file_mime.clone(),
+                            file_url,
+                        });
+                    }
+                }
+
+                if tx.commit().await.is_ok() {
+                    // Достаем из БД список всех участников этой комнаты, чтобы знать, кому слать уведомление
                     if let Ok(members) = sqlx::query!(
                         "SELECT user_id FROM room_members WHERE room_id = $1",
                         payload.room_id
@@ -651,6 +805,7 @@ pub async fn handle_incoming_event(
                             sender_id: Some(*sender_id),
                             content: payload.content,
                             created_at,
+                            attachments: if saved_attachments.is_empty() { None } else { Some(saved_attachments) },
                         };
 
                         let out_msg = WsMessage {
@@ -658,7 +813,7 @@ pub async fn handle_incoming_event(
                             payload: serde_json::to_value(notification).unwrap(),
                         };
 
-                        // 4. Рассылаем сообщение ВСЕМ участникам комнаты, кто сейчас онлайн
+                        // Рассылаем сообщение ВСЕМ участникам комнаты, кто сейчас онлайн
                         for member in members {
                             chat_server.send_to_user(&member.user_id, out_msg.clone());
                         }
@@ -706,6 +861,7 @@ pub async fn handle_incoming_event(
 pub async fn ws_session_loop(
     chat_server: Arc<crate::models::chat::ChatServerState>,
     db: sqlx::PgPool,
+    s3_client: aws_sdk_s3::Client,
     user_id: Uuid,
     mut session: actix_ws::Session,
     mut msg_stream: actix_ws::MessageStream,
@@ -719,14 +875,18 @@ pub async fn ws_session_loop(
                 match maybe_msg {
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
-                            handle_incoming_event(&ws_msg, &user_id, &chat_server, &db).await;
+                            handle_incoming_event(&ws_msg, &user_id, &chat_server, &db, &s3_client).await;
                         }
                     }
                     Some(Ok(Message::Close(reason))) => {
                         let _ = session.close(reason).await;
                         break;
                     }
+                    Some(Ok(Message::Ping(bytes))) => {
+                        let _ = session.pong(&bytes).await;
+                    }
                     Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(Message::Nop)) => {}
                     _ => break,
                 }
             }
@@ -765,6 +925,7 @@ pub struct PaginatedMessages {
 
 pub async fn get_room_messages_paginated(
     db: &sqlx::PgPool,
+    s3_client: &aws_sdk_s3::Client,
     user_id: Uuid,
     room_id: Uuid,
     limit: i64,
@@ -805,7 +966,7 @@ pub async fn get_room_messages_paginated(
     .fetch_one(db)
     .await?;
 
-    let messages = sqlx::query_as::<_, ChatMessage>(
+    let mut messages = sqlx::query_as::<_, ChatMessage>(
         r#"
         SELECT 
             m.id,
@@ -861,6 +1022,59 @@ pub async fn get_room_messages_paginated(
     .bind(offset)
     .fetch_all(db)
     .await?;
+
+    let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+    let mut message_attachments_map = std::collections::HashMap::new();
+
+    if !message_ids.is_empty() {
+        let attachments_raw = sqlx::query!(
+            r#"
+            SELECT id, message_id, file_key, file_name, file_size, file_mime
+            FROM message_attachments
+            WHERE message_id = ANY($1)
+            "#,
+            &message_ids
+        )
+        .fetch_all(db)
+        .await?;
+
+        let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+            .unwrap_or_else(|_| "chat-files".to_string());
+
+        for att in attachments_raw {
+            let file_url = match crate::helpers::s3::get_presigned_download_url(
+                s3_client,
+                &bucket,
+                &att.file_key,
+                7200,
+            )
+            .await
+            {
+                Ok(url) => url,
+                Err(e) => {
+                    eprintln!("Failed to generate presigned download URL for file_key {}: {:?}", att.file_key, e);
+                    format!("{}/{}", bucket, att.file_key)
+                }
+            };
+
+            let response = AttachmentResponse {
+                id: att.id,
+                file_name: att.file_name,
+                file_size: att.file_size,
+                file_mime: att.file_mime,
+                file_url,
+            };
+
+            message_attachments_map
+                .entry(att.message_id)
+                .or_insert_with(Vec::new)
+                .push(response);
+        }
+    }
+
+    for msg in &mut messages {
+        msg.attachments = message_attachments_map.remove(&msg.id);
+    }
 
     let members = sqlx::query_as::<_, RoomMemberInfo>(
         r#"

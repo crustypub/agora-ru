@@ -90,6 +90,7 @@ pub async fn get_room_messages(
     // Загрузка истории сообщений чата через хелпер
     let paginated = crate::helpers::chats::get_room_messages_paginated(
         &state.pool,
+        &state.s3_client,
         user_id,
         room_id,
         limit,
@@ -113,6 +114,7 @@ pub async fn get_room_messages(
                 created_at: msg.created_at,
                 author: msg.author.map(|j| j.0),
                 is_read: msg.is_read,
+                attachments: msg.attachments,
             }
         })
         .collect();
@@ -271,6 +273,7 @@ pub async fn delete_message(
 
     let result = crate::helpers::chats::delete_chat_message(
         &state.pool,
+        &state.s3_client,
         author_id,
         message_id,
         &query.delete_type,
@@ -305,4 +308,111 @@ pub async fn delete_message(
     }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "status": "success" })))
+}
+
+
+use actix_multipart::Multipart;
+
+#[derive(serde::Deserialize)]
+pub struct UploadQuery {
+    pub room_id: Uuid,
+}
+
+#[post("/chat/upload")]
+pub async fn upload_file(
+    user: AuthenticatedUser,
+    query: web::Query<UploadQuery>,
+    payload: Multipart,
+    state: web::Data<AppState>,
+) -> Result<impl Responder, ChatError> {
+    // Проверяем, состоит ли пользователь в этой комнате
+    let is_member = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2) as \"exists!\"",
+        query.room_id,
+        user.id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_err(ChatError::Database)?;
+
+    if !is_member {
+        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+    }
+
+    // Лимит 300 МБ
+    let max_size = 300 * 1024 * 1024;
+    let file = crate::helpers::images::read_multipart_file(payload, max_size)
+        .await
+        .map_err(|e| ChatError::BadRequest(e.to_string()))?;
+
+    let mut filename = file.filename;
+    let mut mime = file.content_type;
+    let mut bytes = file.bytes;
+
+    if mime.starts_with("image/") {
+        match crate::helpers::images::resize_and_encode_webp(&bytes, 1600, 1600) {
+            Ok(webp_bytes) => {
+                bytes = webp_bytes;
+                mime = "image/webp".to_string();
+                let path = std::path::Path::new(&filename);
+                if let Some(stem) = path.file_stem() {
+                    filename = format!("{}.webp", stem.to_string_lossy());
+                } else {
+                    filename = "image.webp".to_string();
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to optimize image, uploading original: {}", e);
+            }
+        }
+    } 
+    // Если это видео, оптимизируем его в MP4 H.264 формат с помощью ffmpeg (max 720p)
+    else if mime.starts_with("video/") {
+        match crate::helpers::images::compress_video(&bytes).await {
+            Ok((compressed_bytes, compressed_mime)) => {
+                bytes = compressed_bytes;
+                mime = compressed_mime;
+                let path = std::path::Path::new(&filename);
+                if let Some(stem) = path.file_stem() {
+                    filename = format!("{}.mp4", stem.to_string_lossy());
+                } else {
+                    filename = "video.mp4".to_string();
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to optimize video, uploading original: {}", e);
+            }
+        }
+    }
+
+    let bucket_name = std::env::var("MINIO_BUCKET_CHAT_FILES")
+        .unwrap_or_else(|_| "chat-files".to_string());
+
+    // Уникальный ключ по пути: chats/{room_id}/{uuid}_{filename}
+    let key = format!("chats/{}/{}_{}", query.room_id, uuid::Uuid::new_v4(), filename);
+    let file_size = bytes.len() as i64;
+
+    state
+        .s3_client
+        .put_object()
+        .bucket(&bucket_name)
+        .key(&key)
+        .body(bytes.into())
+        .content_type(&mime)
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to upload chat file to S3: {:?}", e);
+            ChatError::Database(sqlx::Error::Protocol("S3 upload failed".to_string()))
+        })?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "data": {
+            "file_key": key,
+            "file_name": filename,
+            "file_mime": mime,
+            "file_size": file_size
+        }
+    })))
 }

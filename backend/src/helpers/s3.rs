@@ -42,3 +42,20 @@ pub async fn setup_s3_client() -> S3Client {
 
     client
 }
+
+pub async fn get_presigned_download_url(
+    s3_client: &aws_sdk_s3::Client,
+    bucket: &str,
+    key: &str,
+    expires_in_secs: u64,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let presigned_req = s3_client
+        .get_object()
+        .bucket(bucket)
+        .key(key)
+        .presigned(aws_sdk_s3::presigning::PresigningConfig::expires_in(
+            std::time::Duration::from_secs(expires_in_secs),
+        )?)
+        .await?;
+    Ok(presigned_req.uri().to_string())
+}
