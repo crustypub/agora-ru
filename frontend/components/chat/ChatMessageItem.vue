@@ -279,7 +279,7 @@ const formatBytes = (bytes: number, decimals = 2) => {
     flex-direction: column;
     gap: 0.375rem;
     margin-top: 0.5rem;
-    width: 100%;
+    margin-right: 1.5rem;
   }
 
   &__attachment-link {
