@@ -99,7 +99,44 @@
         </template>
       </div>
 
+      <div v-if="attachedFiles.length > 0" class="chat-area__attached-preview">
+        <div v-for="(file, idx) in attachedFiles" :key="idx" class="chat-area__attached-item">
+          <UIcon :name="getFileIcon(file.mime)" class="chat-area__attached-icon" />
+          <div class="chat-area__attached-info">
+            <span class="chat-area__attached-name" :title="file.name">{{ file.name }}</span>
+            <span class="chat-area__attached-size">({{ formatBytes(file.size) }})</span>
+          </div>
+          <div class="chat-area__attached-actions">
+            <UIcon v-if="file.uploading" name="material-symbols:sync" class="chat-area__attached-spinner" />
+            <UButton
+              v-else
+              icon="material-symbols:close"
+              variant="ghost"
+              color="neutral"
+              size="xs"
+              class="chat-area__attached-remove-btn"
+              @click="removeAttachedFile(idx)"
+            />
+          </div>
+        </div>
+      </div>
+
       <div class="chat-area__input-bar">
+        <UButton
+          icon="material-symbols:attach-file"
+          variant="ghost"
+          color="neutral"
+          size="md"
+          class="chat-area__attach-btn"
+          @click="triggerFileInput"
+        />
+        <input
+          ref="fileInput"
+          type="file"
+          multiple
+          style="display: none"
+          @change="handleFileChange"
+        />
         <UTextarea
           v-model="inputText"
           placeholder="Напишите сообщение..."
@@ -114,7 +151,7 @@
           color="primary"
           size="md"
           class="chat-area__send-btn"
-          :disabled="!inputText.trim()"
+          :disabled="(!inputText.trim() && attachedFiles.length === 0) || attachedFiles.some(f => f.uploading)"
           @click="handleSendMessage"
         />
       </div>
@@ -132,6 +169,8 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useChat } from '~/composables/useChat';
 import { useAuthUser } from '~/composables/useAuthUser';
+import { useNotify } from '~/composables/useNotify';
+import { useApiCall } from '~/composables/useApi';
 import type { IChatMessage } from '~/models/entities/chat.entities';
 import { formatDateDivider, formatUserName } from '~/helpers/chat';
 import ChatMessageItem from './ChatMessageItem.vue';
@@ -159,6 +198,101 @@ const {
 
 const authUser = useAuthUser();
 const currentUserId = computed(() => authUser.value?.id || null);
+
+interface AttachedFile {
+  name: string;
+  size: number;
+  mime: string;
+  uploading: boolean;
+  fileKey?: string;
+}
+
+const attachedFiles = ref<AttachedFile[]>([]);
+const fileInput = ref<HTMLInputElement | null>(null);
+const notify = useNotify();
+
+const triggerFileInput = () => {
+  fileInput.value?.click();
+};
+
+const handleFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  if (!input.files || input.files.length === 0) return;
+
+  const filesArray = Array.from(input.files);
+  input.value = '';
+
+  for (const file of filesArray) {
+    if (file.size > 300 * 1024 * 1024) {
+      notify.error('Файл слишком большой', `Файл "${file.name}" превышает лимит в 300 МБ.`);
+      continue;
+    }
+
+    const newAttached: AttachedFile = {
+      name: file.name,
+      size: file.size,
+      mime: file.type || 'application/octet-stream',
+      uploading: true
+    };
+    
+    attachedFiles.value.push(newAttached);
+    const itemIndex = attachedFiles.value.length - 1;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await useApiCall<{
+        status: string;
+        data: {
+          file_key: string;
+          file_name: string;
+          file_mime: string;
+          file_size: number;
+        };
+      }>(`/api/chat/upload?room_id=${activeRoomId.value}`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.status === 'success' && response.data) {
+        attachedFiles.value[itemIndex] = {
+          name: response.data.file_name,
+          size: response.data.file_size,
+          mime: response.data.file_mime,
+          fileKey: response.data.file_key,
+          uploading: false
+        };
+      } else {
+        throw new Error('Некорректный ответ сервера');
+      }
+    } catch (e: any) {
+      console.error('Ошибка загрузки файла:', e);
+      notify.error('Ошибка загрузки', `Не удалось загрузить файл "${file.name}".`);
+      attachedFiles.value = attachedFiles.value.filter((_, idx) => idx !== itemIndex);
+    }
+  }
+};
+
+const removeAttachedFile = (idx: number) => {
+  attachedFiles.value.splice(idx, 1);
+};
+
+const getFileIcon = (mime: string) => {
+  if (mime.startsWith('image/')) return 'material-symbols:image-outline';
+  if (mime.startsWith('video/')) return 'material-symbols:video-library-outline';
+  if (mime.startsWith('audio/')) return 'material-symbols:audiotrack-outline';
+  return 'material-symbols:description-outline';
+};
+
+const formatBytes = (bytes: number, decimals = 2) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
 
 const feedContainer = ref<HTMLElement | null>(null);
 const inputText = ref('');
@@ -221,6 +355,7 @@ onMounted(() => {
 });
 
 watch(activeRoomId, () => {
+  attachedFiles.value = [];
   nextTick(scrollToBottom);
 });
 
@@ -295,9 +430,27 @@ const handleScroll = () => {
 };
 
 const handleSendMessage = () => {
-  if (!inputText.value.trim()) return;
-  sendMessage(inputText.value);
+  const text = inputText.value.trim();
+  const hasFiles = attachedFiles.value.length > 0;
+  
+  if (!text && !hasFiles) return;
+
+  if (attachedFiles.value.some(f => f.uploading)) {
+    notify.warn('Загрузка в процессе', 'Пожалуйста, дождитесь завершения загрузки всех файлов.');
+    return;
+  }
+
+  const attachmentsPayload = attachedFiles.value.map(f => ({
+    file_key: f.fileKey!,
+    file_name: f.name,
+    file_size: f.size,
+    file_mime: f.mime
+  }));
+
+  sendMessage(text, attachmentsPayload);
+  
   inputText.value = '';
+  attachedFiles.value = [];
 };
 
 // Enter — отправить, Shift+Enter — перенос строки (нативное поведение textarea)
@@ -488,6 +641,77 @@ const handleEnterKey = (e: KeyboardEvent) => {
   &__send-btn {
     flex-shrink: 0;
     height: auto;
+  }
+
+  &__attached-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--ui-border);
+    background-color: var(--ui-bg-elevated);
+    max-height: 150px;
+    overflow-y: auto;
+  }
+
+  &__attached-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--ui-text);
+    background-color: rgba(var(--ui-bg-muted), 0.1);
+    padding: 0.375rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  &__attached-icon {
+    font-size: 1.125rem;
+    color: var(--ui-text-muted);
+  }
+
+  &__attached-info {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__attached-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ui-text-highlighted);
+  }
+
+  &__attached-size {
+    color: var(--ui-text-muted);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  &__attached-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+  }
+
+  &__attached-spinner {
+    animation: spin 1s linear infinite;
+    font-size: 1.125rem;
+    color: var(--ui-primary);
+  }
+
+  &__attached-remove-btn {
+    padding: 0 !important;
+  }
+
+  &__attach-btn {
+    flex-shrink: 0;
   }
 }
 

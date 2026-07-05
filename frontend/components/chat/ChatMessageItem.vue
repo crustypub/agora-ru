@@ -43,6 +43,27 @@
           {{ message.content }}
         </div>
 
+        <div 
+          v-if="message.attachments && message.attachments.length > 0" 
+          class="message-item__attachments"
+        >
+          <a 
+            v-for="att in message.attachments" 
+            :key="att.id"
+            :href="att.file_url"
+            target="_blank"
+            download
+            class="message-item__attachment-link"
+            :title="att.file_name"
+          >
+            <UIcon :name="getFileIcon(att.file_mime)" class="message-item__attachment-icon" />
+            <div class="message-item__attachment-info">
+              <span class="message-item__attachment-name">{{ att.file_name }}</span>
+              <span class="message-item__attachment-size">{{ formatBytes(att.file_size) }}</span>
+            </div>
+          </a>
+        </div>
+
         <div class="message-item__time-wrapper">
           <span>{{ formattedTime }}</span>
           <UIcon 
@@ -118,6 +139,21 @@ const copyText = async () => {
   } catch (err) {
     console.error('Failed to copy message:', err);
   }
+};
+const getFileIcon = (mime: string) => {
+  if (mime.startsWith('image/')) return 'material-symbols:image-outline';
+  if (mime.startsWith('video/')) return 'material-symbols:video-library-outline';
+  if (mime.startsWith('audio/')) return 'material-symbols:audiotrack-outline';
+  return 'material-symbols:description-outline';
+};
+
+const formatBytes = (bytes: number, decimals = 2) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 </script>
 
@@ -236,6 +272,74 @@ const copyText = async () => {
     font-size: 0.75rem;
     flex-shrink: 0;
     color: inherit;
+  }
+
+  &__attachments {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+    width: 100%;
+  }
+
+  &__attachment-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    width: 100%;
+    min-width: 0;
+
+    .message-item__bubble--me & {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.25);
+      }
+    }
+
+    .message-item__bubble--other & {
+      background-color: rgba(0, 0, 0, 0.05);
+      color: var(--ui-text-highlighted);
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.1);
+      }
+      .dark & {
+        background-color: rgba(255, 255, 255, 0.05);
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+      }
+    }
+  }
+
+  &__attachment-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  &__attachment-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    line-height: 1.2;
+  }
+
+  &__attachment-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__attachment-size {
+    font-size: 0.6875rem;
+    opacity: 0.8;
   }
 }
 </style>

@@ -135,7 +135,8 @@ export const useChat = () => {
           sender_id: payload.sender_id,
           content: payload.content,
           created_at: Math.floor(new Date(payload.created_at).getTime() / 1000),
-          author: null
+          author: null,
+          attachments: payload.attachments || null
         };
 
         // Находим информацию об авторе из участников активной комнаты
@@ -156,8 +157,9 @@ export const useChat = () => {
         if (!messagesStore.value[payload.room_id]) {
           messagesStore.value[payload.room_id] = [];
         }
-        if (!messagesStore.value[payload.room_id].some(m => m.id === newMsg.id)) {
-          messagesStore.value[payload.room_id].push(newMsg);
+        const roomMessages = messagesStore.value[payload.room_id]!;
+        if (!roomMessages.some(m => m.id === newMsg.id)) {
+          roomMessages.push(newMsg);
         }
 
         // 2. Сбрасываем счётчик непрочитанных если комната активна, иначе — инкрементируем
@@ -173,7 +175,7 @@ export const useChat = () => {
         // 3. Обновляем превью и поднимаем комнату вверх списка
         const roomIndex = rooms.value.findIndex(r => r.id === payload.room_id);
         if (roomIndex !== -1) {
-          const room = rooms.value[roomIndex];
+          const room = rooms.value[roomIndex]!;
           room.last_message = newMsg;
           rooms.value.splice(roomIndex, 1);
           rooms.value.unshift(room);
@@ -304,11 +306,16 @@ export const useChat = () => {
     }
   };
 
-  const sendMessage = (content: string) => {
-    if (!activeRoomId.value || !content.trim()) return;
+  const sendMessage = (content: string, attachments?: { file_key: string; file_name: string; file_size: number; file_mime: string }[]) => {
+    if (!activeRoomId.value) return;
+    if (!content.trim() && (!attachments || attachments.length === 0)) return;
     sendWsEvent({
       event: 'send_message',
-      payload: { room_id: activeRoomId.value, content: content.trim() }
+      payload: {
+        room_id: activeRoomId.value,
+        content: content.trim(),
+        attachments: attachments && attachments.length > 0 ? attachments : null
+      }
     });
   };
 
