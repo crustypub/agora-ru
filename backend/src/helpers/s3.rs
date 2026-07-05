@@ -3,9 +3,7 @@ use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::Client as S3Client;
 use std::env;
 
-pub async fn setup_s3_client() -> S3Client {
-    let endpoint = env::var("S3_ENDPOINT").expect("S3_ENDPOINT must be set");
-    
+pub async fn create_s3_client_for_endpoint(endpoint: String) -> S3Client {
     let access_key = env::var("S3_ACCESS_KEY").expect("S3_ACCESS_KEY must be set");
     let secret_key = env::var("S3_SECRET_KEY").expect("S3_SECRET_KEY must be set");
     let region = env::var("S3_REGION").expect("S3_REGION must be set");
@@ -29,7 +27,12 @@ pub async fn setup_s3_client() -> S3Client {
         .force_path_style(true)
         .build();
 
-    let client = S3Client::from_conf(s3_config);
+    S3Client::from_conf(s3_config)
+}
+
+pub async fn setup_s3_client() -> S3Client {
+    let endpoint = env::var("S3_ENDPOINT").expect("S3_ENDPOINT must be set");
+    let client = create_s3_client_for_endpoint(endpoint).await;
 
     // Verify bucket exists, if not, panic
     let bucket_name = std::env::var("MINIO_BUCKET_AVATARS")
@@ -41,6 +44,11 @@ pub async fn setup_s3_client() -> S3Client {
     }
 
     client
+}
+
+pub async fn setup_s3_public_client() -> S3Client {
+    let endpoint = env::var("S3_PUBLIC_URL").expect("S3_PUBLIC_URL must be set");
+    create_s3_client_for_endpoint(endpoint).await
 }
 
 pub async fn get_presigned_download_url(

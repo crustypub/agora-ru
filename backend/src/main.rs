@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
 
     let client = helpers::proxy::get_telegram_client().expect("Failed to initialize HTTP client");
     let s3_client = helpers::s3::setup_s3_client().await;
+    let s3_public_client = helpers::s3::setup_s3_public_client().await;
     
     // Get bot username from Telegram API
     let bot_username = helpers::telegram_bot::get_bot_username(&client, &bot_token)
@@ -63,6 +64,7 @@ async fn main() -> std::io::Result<()> {
         bot_username,
         client,
         s3_client,
+        s3_public_client,
         chat_server,
     });
 

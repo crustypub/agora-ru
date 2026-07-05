@@ -90,7 +90,7 @@ pub async fn get_room_messages(
     // Загрузка истории сообщений чата через хелпер
     let paginated = crate::helpers::chats::get_room_messages_paginated(
         &state.pool,
-        &state.s3_client,
+        &state.s3_public_client,
         user_id,
         room_id,
         limit,

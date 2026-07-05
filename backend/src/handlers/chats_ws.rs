@@ -28,7 +28,7 @@ pub async fn chat_ws_route(
     actix_web::rt::spawn(ws_session_loop(
         app_state.get_ref().chat_server.clone(),
         app_state.get_ref().pool.clone(),
-        app_state.get_ref().s3_client.clone(),
+        app_state.get_ref().s3_public_client.clone(),
         user_id,
         session,
         msg_stream,
