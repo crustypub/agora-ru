@@ -12,11 +12,10 @@
       <div class="chat-area__header">
         <div class="chat-area__header-left">
           <UButton
-            v-if="isMobile"
             icon="material-symbols:arrow-back-rounded"
             variant="ghost"
             color="neutral"
-            size="sm"
+            size="lg"
             class="chat-area__back-btn"
             @click="$emit('back')"
           />
