@@ -1,9 +1,9 @@
 import { computed } from 'vue';
-import type { 
-  IChatListItem, 
-  IChatMessage, 
-  IRoomMemberInfo, 
-  WsIncomingEvent, 
+import type {
+  IChatListItem,
+  IChatMessage,
+  IRoomMemberInfo,
+  WsIncomingEvent,
   WsOutgoingEvent,
   IPaginatedResponse,
   IRoomMessagesResponse
@@ -25,33 +25,42 @@ export const useChat = () => {
   const activeRoomId = useState<string | null>('active_room_id', () => null);
   // Переименовано в messagesStore, чтобы отличать от экспортируемого computed<IChatMessage[]>
   const messagesStore = useState<Record<string, IChatMessage[]>>('chat_messages', () => ({}));
-  
+
   // Кэшируем участников для каждой комнаты отдельно, чтобы избежать багов с отображением участников предыдущей комнаты
   const roomMembersStore = useState<Record<string, IRoomMemberInfo[]>>('chat_room_members', () => ({}));
   const activeRoomMembers = computed<IRoomMemberInfo[]>(() => {
     return activeRoomId.value ? roomMembersStore.value[activeRoomId.value] || [] : [];
   });
-  
+
   const isWsConnected = useState<boolean>('chat_ws_connected', () => false);
   const roomsLoading = ref(false);
   const messagesLoading = ref(false);
-  
+
   const roomsMeta = useState<any>('chat_rooms_meta', () => null);
   const messagesMeta = useState<Record<string, any>>('chat_messages_meta', () => ({}));
 
   // --- WebSocket ---
 
-  const connectWs = () => {
+  const connectWs = (isReconnect = false) => {
     if (import.meta.server || ws) return;
     // Сбрасываем счётчик ретраев при явном вызове (например, после повторной авторизации)
-    reconnectAttempts = 0;
+    if (!isReconnect) {
+      reconnectAttempts = 0;
+    }
 
     const config = useRuntimeConfig();
     const apiBase = config.public.apiBase;
     
     let wsUrl = '';
     if (apiBase && (apiBase.startsWith('http://') || apiBase.startsWith('https://'))) {
-      wsUrl = apiBase.replace(/^http/, 'ws') + '/api/ws/chat';
+      let url = apiBase.replace(/^http/, 'ws') + '/api/ws/chat';
+      // Если мы в браузере, подменяем localhost/127.0.0.1 на текущий hostname из window.location,
+      // чтобы совпадали домены для кук (куки с localhost не шлются на 127.0.0.1 и наоборот)
+      if (typeof window !== 'undefined') {
+        const currentHost = window.location.hostname;
+        url = url.replace('127.0.0.1', currentHost).replace('localhost', currentHost);
+      }
+      wsUrl = url;
     } else {
       const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${wsProto}//${window.location.host}/api/ws/chat`;
@@ -88,7 +97,7 @@ export const useChat = () => {
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         const delay = Math.min(1000 * 2 ** reconnectAttempts, 30_000);
         reconnectAttempts++;
-        reconnectTimer = setTimeout(connectWs, delay);
+        reconnectTimer = setTimeout(() => connectWs(true), delay);
       } else {
         console.warn('WebSocket: превышен лимит попыток переподключения. Соединение не восстановлено.');
       }
@@ -119,7 +128,7 @@ export const useChat = () => {
     switch (msg.event) {
       case 'new_message': {
         const payload = msg.payload;
-        
+
         const newMsg: IChatMessage = {
           id: payload.id,
           room_id: payload.room_id,
@@ -174,14 +183,14 @@ export const useChat = () => {
         }
         break;
       }
-      
+
       case 'message_deleted': {
         const { message_id, room_id } = msg.payload;
-        
+
         if (messagesStore.value[room_id]) {
           messagesStore.value[room_id] = messagesStore.value[room_id].filter(m => m.id !== message_id);
         }
-        
+
         // Обновляем превью last_message в списке комнат
         const room = rooms.value.find(r => r.id === room_id);
         if (room && room.last_message?.id === message_id) {
@@ -198,7 +207,7 @@ export const useChat = () => {
 
       case 'room_read': {
         const { room_id, user_id, last_read_at } = msg.payload;
-        
+
         const msgs = messagesStore.value[room_id];
         if (msgs) {
           msgs.forEach(m => {
@@ -207,7 +216,7 @@ export const useChat = () => {
             }
           });
         }
-        
+
         const room = rooms.value.find(r => r.id === room_id);
         if (room && room.last_message) {
           if (room.last_message.sender_id !== user_id && room.last_message.created_at <= last_read_at) {
@@ -241,7 +250,7 @@ export const useChat = () => {
       const response = await useApiCall<IPaginatedResponse<IChatListItem>>('/api/chats', {
         params
       });
-      
+
       if (page === 1) {
         rooms.value = response.data;
       } else {
@@ -370,10 +379,10 @@ export const useChat = () => {
         method: 'DELETE',
         query: { type: deleteType }
       });
-      
+
       if (activeRoomId.value && messagesStore.value[activeRoomId.value]) {
         messagesStore.value[activeRoomId.value] = messagesStore.value[activeRoomId.value].filter(m => m.id !== messageId);
-        
+
         const room = rooms.value.find(r => r.id === activeRoomId.value);
         if (room && room.last_message?.id === messageId) {
           const roomMsgs = messagesStore.value[activeRoomId.value] || [];
@@ -461,7 +470,7 @@ export const useChat = () => {
     roomsMeta,
     messagesMeta: computed(() => (activeRoomId.value ? messagesMeta.value[activeRoomId.value] || null : null)),
     totalUnreadCount,
-    
+
     connectWs,
     disconnectWs,
     resetState,
