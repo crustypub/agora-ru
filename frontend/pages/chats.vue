@@ -96,6 +96,7 @@ onUnmounted(() => {
   if (import.meta.client) {
     window.removeEventListener('resize', checkScreenSize);
   }
+  activeRoomId.value = null;
   // Не закрываем WS здесь — соединение живёт на уровне приложения
 });
 </script>
