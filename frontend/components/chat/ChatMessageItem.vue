@@ -44,11 +44,25 @@
         </div>
 
         <div 
-          v-if="message.attachments && message.attachments.length > 0" 
-          class="message-item__attachments"
+          v-if="imageAttachments.length > 0" 
+          class="message-item__image-grid"
+        >
+          <div 
+            v-for="(att, idx) in imageAttachments" 
+            :key="att.id"
+            class="message-item__image-card"
+            @click="openImageLightbox(idx)"
+          >
+            <img :src="att.file_url" class="message-item__image-thumbnail" :alt="att.file_name" />
+          </div>
+        </div>
+
+        <div 
+          v-if="otherAttachments.length > 0" 
+          class="message-item__file-list"
         >
           <a 
-            v-for="att in message.attachments" 
+            v-for="att in otherAttachments" 
             :key="att.id"
             :href="att.file_url"
             target="_blank"
@@ -75,12 +89,18 @@
       </div>
     </div>
   </div>
+
+  <ChatImageLightbox
+    :images="imageAttachments"
+    v-model:activeIndex="activeImageIndex"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import type { IChatMessage } from '~/models/entities/chat.entities';
 import { useNotify } from '~/composables/useNotify';
+import ChatImageLightbox from './ChatImageLightbox.vue';
 import { formatUserName, formatMessageTime } from '~/helpers/chat';
 
 const props = defineProps<{
@@ -154,6 +174,24 @@ const formatBytes = (bytes: number, decimals = 2) => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+const imageAttachments = computed(() => {
+  return props.message.attachments
+    ? props.message.attachments.filter(att => att.file_mime.startsWith('image/'))
+    : [];
+});
+
+const otherAttachments = computed(() => {
+  return props.message.attachments
+    ? props.message.attachments.filter(att => !att.file_mime.startsWith('image/'))
+    : [];
+});
+
+const activeImageIndex = ref<number | null>(null);
+
+const openImageLightbox = (index: number) => {
+  activeImageIndex.value = index;
 };
 </script>
 
@@ -340,6 +378,47 @@ const formatBytes = (bytes: number, decimals = 2) => {
   &__attachment-size {
     font-size: 0.6875rem;
     opacity: 0.8;
+  }
+
+  &__image-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+    margin-right: 1.5rem;
+
+    // Если у нас одна картинка, делаем её больше
+    &:has(.message-item__image-card:only-child) {
+      .message-item__image-card {
+        width: 140px;
+        height: 140px;
+      }
+    }
+  }
+
+  &__image-card {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: var(--ui-bg-elevated);
+  }
+
+  &__image-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+    margin-right: 1.5rem;
   }
 }
 </style>
