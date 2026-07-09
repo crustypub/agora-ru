@@ -365,24 +365,6 @@ pub async fn upload_file(
                 eprintln!("Failed to optimize image, uploading original: {}", e);
             }
         }
-    } 
-    // Если это видео, оптимизируем его в MP4 H.264 формат с помощью ffmpeg (max 720p)
-    else if mime.starts_with("video/") {
-        match crate::helpers::images::compress_video(&bytes).await {
-            Ok((compressed_bytes, compressed_mime)) => {
-                bytes = compressed_bytes;
-                mime = compressed_mime;
-                let path = std::path::Path::new(&filename);
-                if let Some(stem) = path.file_stem() {
-                    filename = format!("{}.mp4", stem.to_string_lossy());
-                } else {
-                    filename = "video.mp4".to_string();
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to optimize video, uploading original: {}", e);
-            }
-        }
     }
 
     let bucket_name = std::env::var("MINIO_BUCKET_CHAT_FILES")
