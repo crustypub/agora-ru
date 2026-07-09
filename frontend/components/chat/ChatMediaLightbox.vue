@@ -1,49 +1,61 @@
 <template>
-  <UModal v-model:open="isOpen" :title="currentImageName">
+  <UModal v-model:open="isOpen" :title="currentMediaName">
     <template #body>
-      <div class="image-lightbox__body">
+      <div class="media-lightbox__body">
+        <!-- Левая стрелка -->
         <UButton
-          v-if="images.length > 1"
+          v-if="media.length > 1"
           icon="material-symbols:chevron-left"
           variant="ghost"
           color="neutral"
           size="xl"
-          class="image-lightbox__nav-btn image-lightbox__nav-btn--prev"
+          class="media-lightbox__nav-btn media-lightbox__nav-btn--prev"
           @click="showPrev"
         />
 
-        <div class="image-lightbox__image-wrapper">
+        <!-- Медиа (картинка или видео) -->
+        <div class="media-lightbox__media-wrapper">
+          <video
+            v-if="isVideo"
+            ref="videoPlayerRef"
+            :src="currentMediaUrl"
+            controls
+            autoplay
+            playsinline
+            class="media-lightbox__video"
+          ></video>
           <img
-            :src="currentImageUrl"
-            class="image-lightbox__img"
-            :alt="currentImageName"
+            v-else
+            :src="currentMediaUrl"
+            class="media-lightbox__img"
+            :alt="currentMediaName"
           />
         </div>
 
         <!-- Правая стрелка -->
         <UButton
-          v-if="images.length > 1"
+          v-if="media.length > 1"
           icon="material-symbols:chevron-right"
           variant="ghost"
           color="neutral"
           size="xl"
-          class="image-lightbox__nav-btn image-lightbox__nav-btn--next"
+          class="media-lightbox__nav-btn media-lightbox__nav-btn--next"
           @click="showNext"
         />
       </div>
     </template>
 
     <template #footer>
-      <div class="image-lightbox__footer">
-        <div class="image-lightbox__counter">
-          {{ (activeIndex || 0) + 1 }} / {{ images.length }}
+      <div class="media-lightbox__footer">
+        <div class="media-lightbox__counter">
+          {{ (activeIndex || 0) + 1 }} / {{ media.length }}
         </div>
-        <div class="image-lightbox__actions">
+        <div class="media-lightbox__actions">
           <UButton
             color="neutral"
             variant="subtle"
             icon="material-symbols:download"
-            @click="downloadImage"
+            @click="downloadMedia"
           >
             Скачать
           </UButton>
@@ -57,21 +69,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 
-interface IImage {
+interface IMediaItem {
   file_url: string;
   file_name: string;
+  file_mime: string;
 }
 
 const props = defineProps<{
-  images: IImage[];
+  media: IMediaItem[];
   activeIndex: number | null;
 }>();
 
 const emit = defineEmits<{
   (e: 'update:activeIndex', index: number | null): void;
 }>();
+
+const videoPlayerRef = ref<HTMLVideoElement | null>(null);
 
 const isOpen = computed({
   get: () => props.activeIndex !== null,
@@ -82,33 +97,44 @@ const isOpen = computed({
   }
 });
 
-const currentImageUrl = computed(() => {
-  if (props.activeIndex === null) return '';
-  const img = props.images[props.activeIndex];
-  return img ? img.file_url : '';
+const currentMedia = computed(() => {
+  if (props.activeIndex === null) return null;
+  return props.media[props.activeIndex] || null;
 });
 
-const currentImageName = computed(() => {
-  if (props.activeIndex === null) return 'Просмотр';
-  const img = props.images[props.activeIndex];
-  return img ? img.file_name : 'Просмотр';
-});
+const currentMediaUrl = computed(() => currentMedia.value?.file_url || '');
+const currentMediaName = computed(() => currentMedia.value?.file_name || 'Просмотр');
+const currentMediaMime = computed(() => currentMedia.value?.file_mime || '');
+const isVideo = computed(() => currentMediaMime.value.startsWith('video/'));
 
 const showPrev = () => {
   if (props.activeIndex === null) return;
-  const newIndex = (props.activeIndex - 1 + props.images.length) % props.images.length;
+  const newIndex = (props.activeIndex - 1 + props.media.length) % props.media.length;
   emit('update:activeIndex', newIndex);
 };
 
 const showNext = () => {
   if (props.activeIndex === null) return;
-  const newIndex = (props.activeIndex + 1) % props.images.length;
+  const newIndex = (props.activeIndex + 1) % props.media.length;
   emit('update:activeIndex', newIndex);
 };
 
 const close = () => {
   emit('update:activeIndex', null);
 };
+
+// При смене слайда или закрытии — глушим плеер
+watch(() => props.activeIndex, () => {
+  if (videoPlayerRef.value) {
+    videoPlayerRef.value.pause();
+  }
+});
+
+watch(isOpen, (newVal) => {
+  if (!newVal && videoPlayerRef.value) {
+    videoPlayerRef.value.pause();
+  }
+});
 
 const handleKeyDown = (e: KeyboardEvent) => {
   if (props.activeIndex === null) return;
@@ -133,8 +159,8 @@ onUnmounted(() => {
   }
 });
 
-const downloadImage = async () => {
-  const url = currentImageUrl.value;
+const downloadMedia = async () => {
+  const url = currentMediaUrl.value;
   if (!url) return;
   
   try {
@@ -144,21 +170,21 @@ const downloadImage = async () => {
     
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = currentImageName.value;
+    link.download = currentMediaName.value;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
     window.URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.error('Failed to download image:', error);
+    console.error('Failed to download media:', error);
     window.open(url, '_blank');
   }
 };
 </script>
 
 <style lang="scss" scoped>
-.image-lightbox {
+.media-lightbox {
   &__body {
     position: relative;
     display: flex;
@@ -171,7 +197,7 @@ const downloadImage = async () => {
     overflow: hidden;
   }
 
-  &__image-wrapper {
+  &__media-wrapper {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -180,12 +206,21 @@ const downloadImage = async () => {
     padding: 0.5rem;
   }
 
-  &__img {
+  &__img,
+  &__video {
     max-width: 100%;
     max-height: 70vh;
-    object-fit: contain;
     border-radius: 4px;
+  }
+
+  &__img {
+    object-fit: contain;
     user-select: none;
+  }
+
+  &__video {
+    outline: none;
+    background-color: #000;
   }
 
   &__nav-btn {

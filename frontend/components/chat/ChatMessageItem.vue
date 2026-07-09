@@ -44,16 +44,23 @@
         </div>
 
         <div 
-          v-if="imageAttachments.length > 0" 
-          class="message-item__image-grid"
+          v-if="mediaAttachments.length > 0" 
+          class="message-item__media-grid"
         >
           <div 
-            v-for="(att, idx) in imageAttachments" 
+            v-for="(att, idx) in mediaAttachments" 
             :key="att.id"
-            class="message-item__image-card"
-            @click="openImageLightbox(idx)"
+            class="message-item__media-card"
+            @click="openMediaLightbox(idx)"
           >
-            <img :src="att.file_url" class="message-item__image-thumbnail" :alt="att.file_name" />
+            <div v-if="att.file_mime.startsWith('video/')" class="message-item__video-preview">
+              <video :src="att.file_url + '#t=0.5'" class="message-item__video-thumbnail" preload="metadata" muted playsinline></video>
+              <div class="message-item__play-overlay">
+                <UIcon name="material-symbols:play-arrow-rounded" class="message-item__play-icon" />
+              </div>
+            </div>
+            <!-- Изображение -->
+            <img v-else :src="att.file_url" class="message-item__media-thumbnail" :alt="att.file_name" />
           </div>
         </div>
 
@@ -90,9 +97,9 @@
     </div>
   </div>
 
-  <ChatImageLightbox
-    :images="imageAttachments"
-    v-model:activeIndex="activeImageIndex"
+  <ChatMediaLightbox
+    :media="mediaAttachments"
+    v-model:activeIndex="activeMediaIndex"
   />
 </template>
 
@@ -100,7 +107,7 @@
 import { ref, computed } from 'vue';
 import type { IChatMessage } from '~/models/entities/chat.entities';
 import { useNotify } from '~/composables/useNotify';
-import ChatImageLightbox from './ChatImageLightbox.vue';
+import ChatMediaLightbox from './ChatMediaLightbox.vue';
 import { formatUserName, formatMessageTime } from '~/helpers/chat';
 
 const props = defineProps<{
@@ -176,22 +183,26 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-const imageAttachments = computed(() => {
+const mediaAttachments = computed(() => {
   return props.message.attachments
-    ? props.message.attachments.filter(att => att.file_mime.startsWith('image/'))
+    ? props.message.attachments.filter(
+        att => att.file_mime.startsWith('image/') || att.file_mime.startsWith('video/')
+      )
     : [];
 });
 
 const otherAttachments = computed(() => {
   return props.message.attachments
-    ? props.message.attachments.filter(att => !att.file_mime.startsWith('image/'))
+    ? props.message.attachments.filter(
+        att => !att.file_mime.startsWith('image/') && !att.file_mime.startsWith('video/')
+      )
     : [];
 });
 
-const activeImageIndex = ref<number | null>(null);
+const activeMediaIndex = ref<number | null>(null);
 
-const openImageLightbox = (index: number) => {
-  activeImageIndex.value = index;
+const openMediaLightbox = (index: number) => {
+  activeMediaIndex.value = index;
 };
 </script>
 
@@ -380,23 +391,22 @@ const openImageLightbox = (index: number) => {
     opacity: 0.8;
   }
 
-  &__image-grid {
+  &__media-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;
     margin-top: 0.5rem;
     margin-right: 1.5rem;
 
-    // Если у нас одна картинка, делаем её больше
-    &:has(.message-item__image-card:only-child) {
-      .message-item__image-card {
+    &:has(.message-item__media-card:only-child) {
+      .message-item__media-card {
         width: 140px;
         height: 140px;
       }
     }
   }
 
-  &__image-card {
+  &__media-card {
     position: relative;
     width: 80px;
     height: 80px;
@@ -407,10 +417,37 @@ const openImageLightbox = (index: number) => {
     background-color: var(--ui-bg-elevated);
   }
 
-  &__image-thumbnail {
+  &__media-thumbnail,
+  &__video-preview,
+  &__video-thumbnail {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  &__video-preview {
+    position: relative;
+    background-color: #000;
+  }
+
+  &__play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.3);
+    transition: background-color 0.2s ease;
+
+    .message-item__media-card:hover & {
+      background-color: rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  &__play-icon {
+    font-size: 2rem;
+    color: #fff;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   }
 
   &__file-list {
