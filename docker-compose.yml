@@ -105,6 +105,7 @@ services:
       /usr/bin/mc anonymous set download myminio/\"$${MINIO_BUCKET_AVATARS}\" || /usr/bin/mc policy set download myminio/\"$${MINIO_BUCKET_AVATARS}\" || true;
       /usr/bin/mc mb myminio/\"$${MINIO_BUCKET_WIKI_MEDIA}\" || true;
       /usr/bin/mc anonymous set download myminio/\"$${MINIO_BUCKET_WIKI_MEDIA}\" || /usr/bin/mc policy set download myminio/\"$${MINIO_BUCKET_WIKI_MEDIA}\" || true;
+      /usr/bin/mc mb myminio/\"$${MINIO_BUCKET_CHAT_FILES}\" || true;
       exit 0;
       "
     depends_on:

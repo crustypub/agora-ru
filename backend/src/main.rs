@@ -15,10 +15,10 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::{handlers::{chats::get_rooms, user::{delete_avatar, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}}, models::chat::ChatServerState};
+use crate::{handlers::{chats::get_rooms, user::{delete_avatar, get_users, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}}, models::chat::ChatServerState};
 use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get_comments};
 use crate::handlers::chats_ws::chat_ws_route;
-use crate::handlers::chats::{create_room, add_member, remove_member, delete_message, get_room_messages};
+use crate::handlers::chats::{create_room, add_member, remove_member, delete_message, get_room_messages, upload_file, parse_link};
 
 
 #[actix_web::main]
@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
 
     let client = helpers::proxy::get_telegram_client().expect("Failed to initialize HTTP client");
     let s3_client = helpers::s3::setup_s3_client().await;
+    let s3_public_client = helpers::s3::setup_s3_public_client().await;
     
     // Get bot username from Telegram API
     let bot_username = helpers::telegram_bot::get_bot_username(&client, &bot_token)
@@ -63,6 +64,7 @@ async fn main() -> std::io::Result<()> {
         bot_username,
         client,
         s3_client,
+        s3_public_client,
         chat_server,
     });
 
@@ -104,15 +106,18 @@ async fn main() -> std::io::Result<()> {
                 .service(edit_comment)
                 .service(delete_comment)
                 .service(update_user_info)
+                .service(get_users)
                 .service(upload_avatar)
                 .service(delete_avatar)
                 .service(chat_ws_route)
                 .service(create_room)
                 .service(get_rooms)
+                .service(parse_link)      // до /chats/{room_id} — иначе actix захватит его как path param
                 .service(get_room_messages)
                 .service(add_member)
                 .service(remove_member)
                 .service(delete_message)
+                .service(upload_file)
         )
     })
     .bind(("0.0.0.0", 6080))?

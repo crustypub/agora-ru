@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO room_members (room_id, user_id, role)\n        VALUES ($1, $2, $3::room_role)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "room_role",
+            "kind": {
+              "Enum": [
+                "owner",
+                "moderator",
+                "member"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "50d44e85c3f06bdfe926e777a510996d301aa024b08bea5e1bff513a5fb2dd51"
+}

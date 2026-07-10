@@ -3,15 +3,20 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    helpers::{api::AuthenticatedUser, chats::{ChatError, MessageDeletionResult::EveryoneDeleted, create_direct_room}}, models::{
-        app::AppState, chat::{
-            AddMemberRequest, ChatListItemResponse, ChatMessageResponse, ChatRoomType, CreateChatRoomRequest, DeleteMessageQuery, MessageDeletedNotification, RoomsParams, WsMessage,
+    helpers::{
+        api::AuthenticatedUser,
+        chats::{ChatError, MessageDeletionResult::EveryoneDeleted, create_direct_room, is_url_safe, extract_og},
+    },
+    models::{
+        app::AppState,
+        chat::{
+            AddMemberRequest, ChatListItemResponse, ChatMessageResponse, ChatRoomType,
+            CreateChatRoomRequest, DeleteMessageQuery, MessageDeletedNotification,
+            ParseLinkQuery, RoomsParams, WsMessage,
         },
     },
 };
 
-/// Получает пагинированный список чат-комнат пользователя.
-/// Поддерживает фильтрацию по поисковой строке `search_value`.
 #[get("/chats")]
 pub async fn get_rooms(
     user: AuthenticatedUser,
@@ -21,13 +26,11 @@ pub async fn get_rooms(
     let user_id = user.id;
     let limit = params.limit;
 
-    // Подготовка ILIKE-паттерна для поиска
     let search_pattern = params
         .search_value
         .as_ref()
         .map(|val| format!("%{}%", val.trim()));
 
-    // Загрузка комнат из БД
     let paginated = crate::helpers::chats::get_user_rooms_paginated(
         &state.pool,
         user_id,
@@ -39,7 +42,6 @@ pub async fn get_rooms(
 
     let total_pages = (paginated.total_count as f64 / limit as f64).ceil() as i64;
 
-    // Приведение к ответной структуре с разворачиванием sqlx JSON полей
     let response: Vec<ChatListItemResponse> = paginated
         .rooms
         .into_iter()
@@ -95,6 +97,7 @@ pub async fn get_room_messages(
     // Загрузка истории сообщений чата через хелпер
     let paginated = crate::helpers::chats::get_room_messages_paginated(
         &state.pool,
+        &state.s3_public_client,
         user_id,
         room_id,
         limit,
@@ -117,6 +120,8 @@ pub async fn get_room_messages(
                 content: msg.content,
                 created_at: msg.created_at,
                 author: msg.author.map(|j| j.0),
+                is_read: msg.is_read,
+                attachments: msg.attachments,
             }
         })
         .collect();
@@ -275,6 +280,7 @@ pub async fn delete_message(
 
     let result = crate::helpers::chats::delete_chat_message(
         &state.pool,
+        &state.s3_client,
         author_id,
         message_id,
         &query.delete_type,
@@ -309,4 +315,201 @@ pub async fn delete_message(
     }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "status": "success" })))
+}
+
+
+use actix_multipart::Multipart;
+
+#[derive(serde::Deserialize)]
+pub struct UploadQuery {
+    pub room_id: Uuid,
+}
+
+#[post("/chat/upload")]
+pub async fn upload_file(
+    user: AuthenticatedUser,
+    query: web::Query<UploadQuery>,
+    payload: Multipart,
+    state: web::Data<AppState>,
+) -> Result<impl Responder, ChatError> {
+    // Проверяем, состоит ли пользователь в этой комнате
+    let is_member = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2) as \"exists!\"",
+        query.room_id,
+        user.id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_err(ChatError::Database)?;
+
+    if !is_member {
+        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+    }
+
+    // Лимит 300 МБ
+    let max_size = 300 * 1024 * 1024;
+    let file = crate::helpers::images::read_multipart_file(payload, max_size)
+        .await
+        .map_err(|e| ChatError::BadRequest(e.to_string()))?;
+
+    let mut filename = file.filename;
+    let mut mime = file.content_type;
+    let mut bytes = file.bytes;
+
+    if mime.starts_with("image/") {
+        match crate::helpers::images::resize_and_encode_webp(&bytes, 1600, 1600) {
+            Ok(webp_bytes) => {
+                bytes = webp_bytes;
+                mime = "image/webp".to_string();
+                let path = std::path::Path::new(&filename);
+                if let Some(stem) = path.file_stem() {
+                    filename = format!("{}.webp", stem.to_string_lossy());
+                } else {
+                    filename = "image.webp".to_string();
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to optimize image, uploading original: {}", e);
+            }
+        }
+    }
+
+    let bucket_name = std::env::var("MINIO_BUCKET_CHAT_FILES")
+        .unwrap_or_else(|_| "chat-files".to_string());
+
+    // Уникальный ключ по пути: chats/{room_id}/{uuid}_{filename}
+    let key = format!("chats/{}/{}_{}", query.room_id, uuid::Uuid::new_v4(), filename);
+    let file_size = bytes.len() as i64;
+
+    state
+        .s3_client
+        .put_object()
+        .bucket(&bucket_name)
+        .key(&key)
+        .body(bytes.into())
+        .content_type(&mime)
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to upload chat file to S3: {:?}", e);
+            ChatError::Database(sqlx::Error::Protocol("S3 upload failed".to_string()))
+        })?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "data": {
+            "file_key": key,
+            "file_name": filename,
+            "file_mime": mime,
+            "file_size": file_size
+        }
+    })))
+}
+
+
+#[get("/chats/parse-link")]
+pub async fn parse_link(
+    query: web::Query<ParseLinkQuery>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let url = query.url.trim().to_string();
+
+    if !is_url_safe(&url) {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "message": "Invalid or disallowed URL"
+        }));
+    }
+
+    let response = state
+        .client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(4))
+        .header("User-Agent", "Mozilla/5.0 (compatible; AgoraBot/1.0; +https://agora.ru)")
+        .header("Accept", "text/html,application/xhtml+xml")
+        .send()
+        .await;
+
+    let resp = match response {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("parse-link fetch error for {}: {}", url, e);
+            return HttpResponse::BadGateway().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to fetch URL"
+            }));
+        }
+    };
+
+    // Читаем не более 256 КБ, чтобы не тащить тяжёлые страницы целиком
+    const MAX_BYTES: usize = 256 * 1024;
+    let bytes = match resp.bytes().await {
+        Ok(b) => b,
+        Err(_) => {
+            return HttpResponse::BadGateway().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to read response body"
+            }));
+        }
+    };
+    let html = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_BYTES)]);
+
+
+    let title = extract_og(
+        &html,
+        r#"(?i)<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']"#,
+    )
+    .or_else(|| {
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']"#,
+        )
+    })
+    .or_else(|| extract_og(&html, r#"(?i)<title[^>]*>([^<]+)</title>"#));
+
+    let title = match title {
+        Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+        _ => {
+            return HttpResponse::Ok().json(serde_json::json!({
+                "status": "error",
+                "message": "No title found"
+            }));
+        }
+    };
+
+    let description = extract_og(
+        &html,
+        r#"(?i)<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']"#,
+    )
+    .or_else(|| {
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']"#,
+        )
+    })
+    .or_else(|| {
+        // Фоллбэк на meta description
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']"#,
+        )
+    });
+
+    let image_url = extract_og(
+        &html,
+        r#"(?i)<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']"#,
+    )
+    .or_else(|| {
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']"#,
+        )
+    });
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "url": url,
+        "title": title,
+        "description": description,
+        "image_url": image_url,
+    }))
 }

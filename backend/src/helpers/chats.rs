@@ -1,11 +1,13 @@
+use crate::models::chat::{
+    AttachmentResponse, ChatListItem, ChatMessage, ReadRoomPayload, RoomMemberInfo, SendMessagePayload, WsMessage,
+};
+use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use actix_ws::Message;
 use futures_util::StreamExt;
+use std::fmt;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use actix_web::{ResponseError, HttpResponse, http::StatusCode};
-use std::fmt;
-use crate::models::chat::{WsMessage, SendMessagePayload, ReadRoomPayload, ChatListItem, ChatMessage, RoomMemberInfo};
 
 /// Кастомное перечисление ошибок для чат-системы.
 /// Реализует `ResponseError`, что позволяет автоматически преобразовывать ошибки
@@ -73,7 +75,6 @@ pub struct PaginatedRooms {
     pub total_count: i64,
 }
 
-/// Получает пагинированный список комнат пользователя с поддержкой поиска.
 pub async fn get_user_rooms_paginated(
     db: &sqlx::PgPool,
     user_id: Uuid,
@@ -81,7 +82,6 @@ pub async fn get_user_rooms_paginated(
     offset: i64,
     search_pattern: Option<String>,
 ) -> Result<PaginatedRooms, ChatError> {
-    // 1. Считаем общее количество подходящих комнат для метаданных пагинации
     let total_count = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) as "count!"
@@ -112,7 +112,6 @@ pub async fn get_user_rooms_paginated(
     .fetch_one(db)
     .await?;
 
-    // 2. Получаем пагинированный список комнат вместе с последним сообщением и информацией о собеседнике
     let rooms = sqlx::query_as::<_, ChatListItem>(
         r#"
         SELECT
@@ -148,7 +147,25 @@ pub async fn get_user_rooms_paginated(
                         'first_name', u.first_name,
                         'last_name', u.last_name,
                         'avatar_url', u.avatar_url
-                    )
+                    ),
+                    'is_read', CASE
+                        WHEN m.sender_id = $1 THEN 
+                            EXISTS (
+                                SELECT 1 
+                                FROM room_members rm_other 
+                                WHERE rm_other.room_id = m.room_id 
+                                  AND rm_other.user_id != $1 
+                                  AND rm_other.last_read_at >= m.created_at
+                            )
+                        ELSE 
+                            EXISTS (
+                                SELECT 1 
+                                FROM room_members rm_self 
+                                WHERE rm_self.room_id = m.room_id 
+                                  AND rm_self.user_id = $1 
+                                  AND rm_self.last_read_at >= m.created_at
+                            )
+                    END
                 )
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
@@ -223,15 +240,15 @@ pub async fn get_user_rooms_paginated(
     Ok(PaginatedRooms { rooms, total_count })
 }
 
-/// Создает личную комнату (direct chat) между двумя пользователями.
-/// Возвращает UUID комнаты и флаг `already_exists`, если комната была создана ранее.
 pub async fn create_direct_room(
     db: &sqlx::PgPool,
     author_id: Uuid,
     user_2: Uuid,
 ) -> Result<(Uuid, bool), ChatError> {
     if author_id == user_2 {
-        return Err(ChatError::BadRequest("Cannot create direct chat with yourself".to_string()));
+        return Err(ChatError::BadRequest(
+            "Cannot create direct chat with yourself".to_string(),
+        ));
     }
 
     // Алфавитный ключ для уникальности переписки двух пользователей
@@ -243,12 +260,10 @@ pub async fn create_direct_room(
     let direct_key = format!("{}:{}", min_user, max_user);
 
     // Проверяем, существует ли уже такой чат
-    let existing_room = sqlx::query_scalar!(
-        "SELECT id FROM rooms WHERE direct_key = $1",
-        direct_key
-    )
-    .fetch_optional(db)
-    .await?;
+    let existing_room =
+        sqlx::query_scalar!("SELECT id FROM rooms WHERE direct_key = $1", direct_key)
+            .fetch_optional(db)
+            .await?;
 
     if let Some(room_id) = existing_room {
         return Ok((room_id, true));
@@ -344,14 +359,12 @@ pub async fn create_group_room(
     Ok(room_id)
 }
 
-/// Добавляет нового участника в групповой чат, проверяя права запрашивающего.
 pub async fn add_room_member(
     db: &sqlx::PgPool,
     requester_id: Uuid,
     room_id: Uuid,
     target_user_id: Uuid,
 ) -> Result<(), ChatError> {
-    // 1. Проверяем тип комнаты и роль запрашивающего
     let room_info = sqlx::query!(
         r#"
         SELECT type::text as room_type,
@@ -367,7 +380,9 @@ pub async fn add_room_member(
     let info = room_info.ok_or_else(|| ChatError::NotFound("Room not found".to_string()))?;
 
     if info.room_type.as_deref() == Some("direct") {
-        return Err(ChatError::BadRequest("Cannot add members to direct chats".to_string()));
+        return Err(ChatError::BadRequest(
+            "Cannot add members to direct chats".to_string(),
+        ));
     }
 
     let role = info.requester_role.ok_or_else(|| {
@@ -376,10 +391,11 @@ pub async fn add_room_member(
 
     // Приглашать могут только владельцы и модераторы
     if role != "owner" && role != "moderator" {
-        return Err(ChatError::Forbidden("You do not have permission to invite members (must be owner or moderator)".to_string()));
+        return Err(ChatError::Forbidden(
+            "You do not have permission to invite members (must be owner or moderator)".to_string(),
+        ));
     }
 
-    // 2. Проверяем существование приглашаемого пользователя
     let user_exists = sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) as \"exists!\"",
         target_user_id
@@ -392,7 +408,6 @@ pub async fn add_room_member(
         return Err(ChatError::NotFound("User to invite not found".to_string()));
     }
 
-    // 3. Добавляем в участники
     let result = sqlx::query!(
         r#"
         INSERT INTO room_members (room_id, user_id, role)
@@ -407,13 +422,14 @@ pub async fn add_room_member(
     .await?;
 
     if result.rows_affected() == 0 {
-        Err(ChatError::Conflict("User is already a member of this room".to_string()))
+        Err(ChatError::Conflict(
+            "User is already a member of this room".to_string(),
+        ))
     } else {
         Ok(())
     }
 }
 
-/// Удаляет участника из группового чата (кик или самостоятельный выход), проверяя права.
 pub async fn remove_room_member(
     db: &sqlx::PgPool,
     requester_id: Uuid,
@@ -435,10 +451,13 @@ pub async fn remove_room_member(
     .fetch_optional(db)
     .await?;
 
-    let roles_info = roles.ok_or_else(|| ChatError::NotFound("Room or member information not found".to_string()))?;
+    let roles_info = roles
+        .ok_or_else(|| ChatError::NotFound("Room or member information not found".to_string()))?;
 
     if roles_info.room_type.as_deref() == Some("direct") {
-        return Err(ChatError::BadRequest("Cannot modify members in direct chats".to_string()));
+        return Err(ChatError::BadRequest(
+            "Cannot modify members in direct chats".to_string(),
+        ));
     }
 
     let req_role = roles_info.requester_role.ok_or_else(|| {
@@ -452,13 +471,19 @@ pub async fn remove_room_member(
     // Если это принудительный кик (а не самостоятельный выход), проверяем иерархию прав
     if requester_id != target_user_id {
         if req_role == "member" {
-            return Err(ChatError::Forbidden("Members cannot kick other users".to_string()));
+            return Err(ChatError::Forbidden(
+                "Members cannot kick other users".to_string(),
+            ));
         }
         if req_role == "moderator" && tgt_role != "member" {
-            return Err(ChatError::Forbidden("Moderators can only kick regular members".to_string()));
+            return Err(ChatError::Forbidden(
+                "Moderators can only kick regular members".to_string(),
+            ));
         }
         if tgt_role == "owner" {
-            return Err(ChatError::Forbidden("Cannot kick the owner of the room".to_string()));
+            return Err(ChatError::Forbidden(
+                "Cannot kick the owner of the room".to_string(),
+            ));
         }
     }
 
@@ -482,12 +507,9 @@ pub async fn remove_room_member(
 
     // Если участников не осталось, полностью удаляем комнату
     if remaining_count == 0 {
-        sqlx::query!(
-            "DELETE FROM rooms WHERE id = $1",
-            room_id
-        )
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query!("DELETE FROM rooms WHERE id = $1", room_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     tx.commit().await?;
@@ -503,12 +525,15 @@ pub enum MessageDeletionResult {
 /// Удаляет сообщение для всех (soft delete) или только скрывает для конкретного пользователя.
 pub async fn delete_chat_message(
     db: &sqlx::PgPool,
+    s3_client: &aws_sdk_s3::Client,
     requester_id: Uuid,
     message_id: Uuid,
     delete_type: &str,
 ) -> Result<MessageDeletionResult, ChatError> {
     if delete_type != "me" && delete_type != "everyone" {
-        return Err(ChatError::BadRequest("Invalid delete type. Must be 'me' or 'everyone'".to_string()));
+        return Err(ChatError::BadRequest(
+            "Invalid delete type. Must be 'me' or 'everyone'".to_string(),
+        ));
     }
 
     // Проверяем существование сообщения, автора, роль запрашивающего и членство в комнате
@@ -531,7 +556,9 @@ pub async fn delete_chat_message(
     let msg_info = msg_info.ok_or_else(|| ChatError::NotFound("Message not found".to_string()))?;
 
     if !msg_info.is_member {
-        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+        return Err(ChatError::Forbidden(
+            "You do not have access to this room".to_string(),
+        ));
     }
 
     if delete_type == "everyone" {
@@ -541,26 +568,115 @@ pub async fn delete_chat_message(
 
         // Удалять сообщения "у всех" могут только автор сообщения или владелец/модератор
         if !is_author && !is_privileged {
-            return Err(ChatError::Forbidden("You do not have permission to delete this message for everyone".to_string()));
+            return Err(ChatError::Forbidden(
+                "You do not have permission to delete this message for everyone".to_string(),
+            ));
         }
+
+        let mut tx = db.begin().await?;
 
         sqlx::query!(
             "UPDATE messages SET deleted_at = NOW() WHERE id = $1",
             message_id
         )
-        .execute(db)
+        .execute(&mut *tx)
         .await?;
 
-        Ok(MessageDeletionResult::EveryoneDeleted { room_id: msg_info.room_id })
+        // Запрашиваем вложения, чтобы потом удалить их из S3
+        let attachments = sqlx::query!(
+            "SELECT file_key FROM message_attachments WHERE message_id = $1",
+            message_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+
+        // Удаляем вложения из базы данных
+        sqlx::query!(
+            "DELETE FROM message_attachments WHERE message_id = $1",
+            message_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        // Физическое удаление файлов из S3 (после фиксации транзакции)
+        let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+            .unwrap_or_else(|_| "chat-files".to_string());
+        for att in attachments {
+            let _ = s3_client
+                .delete_object()
+                .bucket(&bucket)
+                .key(&att.file_key)
+                .send()
+                .await;
+        }
+
+        Ok(MessageDeletionResult::EveryoneDeleted {
+            room_id: msg_info.room_id,
+        })
     } else {
         // Удаление "для себя" — просто скрываем сообщение в локальной таблице скрытых сообщений
+        let mut tx = db.begin().await?;
+
         sqlx::query!(
             "INSERT INTO deleted_messages (message_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
             message_id,
             requester_id
         )
-        .execute(db)
+        .execute(&mut *tx)
         .await?;
+
+        let total_members = sqlx::query_scalar!(
+            "SELECT COUNT(*) as \"count!\" FROM room_members WHERE room_id = $1",
+            msg_info.room_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let deleted_by_count = sqlx::query_scalar!(
+            "SELECT COUNT(*) as \"count!\" FROM deleted_messages WHERE message_id = $1",
+            message_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let mut attachments_to_delete = Vec::new();
+        let mut fully_deleted = false;
+
+        // Если сообщение удалили все участники чата, полностью удаляем его из базы данных и S3
+        if deleted_by_count >= total_members {
+            fully_deleted = true;
+            let attachments = sqlx::query!(
+                "SELECT file_key FROM message_attachments WHERE message_id = $1",
+                message_id
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            attachments_to_delete = attachments.into_iter().map(|a| a.file_key).collect();
+
+            sqlx::query!(
+                "DELETE FROM messages WHERE id = $1",
+                message_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        if fully_deleted {
+            let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+                .unwrap_or_else(|_| "chat-files".to_string());
+            for key in attachments_to_delete {
+                let _ = s3_client
+                    .delete_object()
+                    .bucket(&bucket)
+                    .key(&key)
+                    .send()
+                    .await;
+            }
+        }
 
         Ok(MessageDeletionResult::MeDeleted)
     }
@@ -571,6 +687,7 @@ pub async fn handle_incoming_event(
     sender_id: &Uuid,
     chat_server: &crate::models::chat::ChatServerState,
     db: &sqlx::PgPool,
+    s3_client: &aws_sdk_s3::Client,
 ) {
     match msg.event.as_str() {
         "send_message" => {
@@ -589,24 +706,98 @@ pub async fn handle_incoming_event(
                     return;
                 }
 
-                // Сохраняем сообщение в базу данных PostgreSQL через SQLx
+                // Сохраняем сообщение и вложения в базу данных в рамках одной транзакции
                 let msg_id = Uuid::new_v4();
                 let created_at = chrono::Utc::now();
-                
+
+                let mut tx = match db.begin().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("Failed to start transaction for message save: {:?}", e);
+                        return;
+                    }
+                };
+
                 let db_result = sqlx::query!(
                     "INSERT INTO messages (id, room_id, sender_id, content, created_at) 
                      VALUES ($1, $2, $3, $4, $5)",
-                    msg_id, payload.room_id, sender_id, payload.content, created_at
+                    msg_id,
+                    payload.room_id,
+                    sender_id,
+                    payload.content,
+                    created_at
                 )
-                .execute(db).await;
+                .execute(&mut *tx)
+                .await;
 
-                if db_result.is_ok() {
-                    // 3. Достаем из БД список всех участников этой комнаты, чтобы знать, кому слать уведомление
+                if db_result.is_err() {
+                    let _ = tx.rollback().await;
+                    return;
+                }
+
+                let mut saved_attachments = Vec::new();
+                if let Some(attachments) = &payload.attachments {
+                    let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+                        .unwrap_or_else(|_| "chat-files".to_string());
+                    
+                    for att in attachments {
+                        let att_id = Uuid::new_v4();
+                        let insert_result = sqlx::query!(
+                            r#"
+                            INSERT INTO message_attachments (id, message_id, file_key, file_name, file_size, file_mime)
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                            "#,
+                            att_id,
+                            msg_id,
+                            att.file_key,
+                            att.file_name,
+                            att.file_size,
+                            att.file_mime
+                        )
+                        .execute(&mut *tx)
+                        .await;
+
+                        if let Err(e) = insert_result {
+                            eprintln!("Failed to insert message attachment: {:?}", e);
+                            let _ = tx.rollback().await;
+                            return;
+                        }
+
+                        // Сразу генерируем presigned URL для рассылки события клиентам
+                        let file_url = match crate::helpers::s3::get_presigned_download_url(
+                            s3_client,
+                            &bucket,
+                            &att.file_key,
+                            7200,
+                        )
+                        .await
+                        {
+                            Ok(url) => url,
+                            Err(e) => {
+                                eprintln!("Failed to generate presigned download URL for file_key {}: {:?}", att.file_key, e);
+                                format!("{}/{}", bucket, att.file_key)
+                            }
+                        };
+
+                        saved_attachments.push(AttachmentResponse {
+                            id: att_id,
+                            file_name: att.file_name.clone(),
+                            file_size: att.file_size,
+                            file_mime: att.file_mime.clone(),
+                            file_url,
+                        });
+                    }
+                }
+
+                if tx.commit().await.is_ok() {
+                    // Достаем из БД список всех участников этой комнаты, чтобы знать, кому слать уведомление
                     if let Ok(members) = sqlx::query!(
                         "SELECT user_id FROM room_members WHERE room_id = $1",
                         payload.room_id
-                    ).fetch_all(db).await {
-
+                    )
+                    .fetch_all(db)
+                    .await
+                    {
                         // Подготавливаем красивый JSON для фронта
                         let notification = crate::models::chat::NewMessageNotification {
                             id: msg_id,
@@ -614,6 +805,7 @@ pub async fn handle_incoming_event(
                             sender_id: Some(*sender_id),
                             content: payload.content,
                             created_at,
+                            attachments: if saved_attachments.is_empty() { None } else { Some(saved_attachments) },
                         };
 
                         let out_msg = WsMessage {
@@ -621,7 +813,7 @@ pub async fn handle_incoming_event(
                             payload: serde_json::to_value(notification).unwrap(),
                         };
 
-                        // 4. Рассылаем сообщение ВСЕМ участникам комнаты, кто сейчас онлайн
+                        // Рассылаем сообщение ВСЕМ участникам комнаты, кто сейчас онлайн
                         for member in members {
                             chat_server.send_to_user(&member.user_id, out_msg.clone());
                         }
@@ -632,12 +824,33 @@ pub async fn handle_incoming_event(
 
         "read_room" => {
             if let Ok(payload) = serde_json::from_value::<ReadRoomPayload>(msg.payload.clone()) {
-                // Обновляем метку времени прочтения в БД
-                let _ = sqlx::query!(
-                    "UPDATE room_members SET last_read_at = NOW() WHERE room_id = $1 AND user_id = $2",
+                if let Ok(record) = sqlx::query!(
+                    "UPDATE room_members SET last_read_at = NOW() 
+                     WHERE room_id = $1 AND user_id = $2
+                     RETURNING EXTRACT(EPOCH FROM last_read_at)::BIGINT as \"last_read_at!\"",
                     payload.room_id, sender_id
                 )
-                .execute(db).await;
+                .fetch_one(db).await {
+                    if let Ok(members) = sqlx::query!(
+                        "SELECT user_id FROM room_members WHERE room_id = $1 AND user_id != $2",
+                        payload.room_id, sender_id
+                    )
+                    .fetch_all(db)
+                    .await {
+                        let out_msg = WsMessage {
+                            event: "room_read".to_string(),
+                            payload: serde_json::json!({
+                                "room_id": payload.room_id,
+                                "user_id": sender_id,
+                                "last_read_at": record.last_read_at
+                            }),
+                        };
+
+                        for member in members {
+                            chat_server.send_to_user(&member.user_id, out_msg.clone());
+                        }
+                    }
+                }
             }
         }
 
@@ -648,6 +861,7 @@ pub async fn handle_incoming_event(
 pub async fn ws_session_loop(
     chat_server: Arc<crate::models::chat::ChatServerState>,
     db: sqlx::PgPool,
+    s3_client: aws_sdk_s3::Client,
     user_id: Uuid,
     mut session: actix_ws::Session,
     mut msg_stream: actix_ws::MessageStream,
@@ -661,14 +875,18 @@ pub async fn ws_session_loop(
                 match maybe_msg {
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
-                            handle_incoming_event(&ws_msg, &user_id, &chat_server, &db).await;
+                            handle_incoming_event(&ws_msg, &user_id, &chat_server, &db, &s3_client).await;
                         }
                     }
                     Some(Ok(Message::Close(reason))) => {
                         let _ = session.close(reason).await;
                         break;
                     }
+                    Some(Ok(Message::Ping(bytes))) => {
+                        let _ = session.pong(&bytes).await;
+                    }
                     Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(Message::Nop)) => {}
                     _ => break,
                 }
             }
@@ -705,17 +923,15 @@ pub struct PaginatedMessages {
     pub members: Vec<RoomMemberInfo>,
 }
 
-/// Получает историю сообщений конкретной комнаты с поддержкой поиска и пагинации.
-/// Перед получением проверяет, состоит ли пользователь в этой комнате.
 pub async fn get_room_messages_paginated(
     db: &sqlx::PgPool,
+    s3_client: &aws_sdk_s3::Client,
     user_id: Uuid,
     room_id: Uuid,
     limit: i64,
     offset: i64,
     search_pattern: Option<String>,
 ) -> Result<PaginatedMessages, ChatError> {
-    // 1. Проверяем членство пользователя в комнате
     let is_member = sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2) as \"exists!\"",
         room_id,
@@ -726,10 +942,11 @@ pub async fn get_room_messages_paginated(
     .unwrap_or(false);
 
     if !is_member {
-        return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
+        return Err(ChatError::Forbidden(
+            "You do not have access to this room".to_string(),
+        ));
     }
 
-    // 2. Считаем общее число сообщений (исключая удаленные для всех или скрытые для текущего юзера)
     let total_count = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) as "count!"
@@ -749,8 +966,7 @@ pub async fn get_room_messages_paginated(
     .fetch_one(db)
     .await?;
 
-    // 3. Выбираем пагинированный список сообщений
-    let messages = sqlx::query_as::<_, ChatMessage>(
+    let mut messages = sqlx::query_as::<_, ChatMessage>(
         r#"
         SELECT 
             m.id,
@@ -767,7 +983,25 @@ pub async fn get_room_messages_paginated(
                     'avatar_url', u.avatar_url
                 )
                 ELSE NULL
-            END as author
+            END as author,
+            CASE
+                WHEN m.sender_id = $2 THEN
+                    EXISTS (
+                        SELECT 1
+                        FROM room_members rm_other
+                        WHERE rm_other.room_id = m.room_id
+                          AND rm_other.user_id != $2
+                          AND rm_other.last_read_at >= m.created_at
+                    )
+                ELSE
+                    EXISTS (
+                        SELECT 1
+                        FROM room_members rm_self
+                        WHERE rm_self.room_id = m.room_id
+                          AND rm_self.user_id = $2
+                          AND rm_self.last_read_at >= m.created_at
+                    )
+            END as is_read
         FROM messages m
         LEFT JOIN users u ON m.sender_id = u.id
         WHERE m.room_id = $1
@@ -789,7 +1023,59 @@ pub async fn get_room_messages_paginated(
     .fetch_all(db)
     .await?;
 
-    // 4. Получаем список участников комнаты
+    let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+    let mut message_attachments_map = std::collections::HashMap::new();
+
+    if !message_ids.is_empty() {
+        let attachments_raw = sqlx::query!(
+            r#"
+            SELECT id, message_id, file_key, file_name, file_size, file_mime
+            FROM message_attachments
+            WHERE message_id = ANY($1)
+            "#,
+            &message_ids
+        )
+        .fetch_all(db)
+        .await?;
+
+        let bucket = std::env::var("MINIO_BUCKET_CHAT_FILES")
+            .unwrap_or_else(|_| "chat-files".to_string());
+
+        for att in attachments_raw {
+            let file_url = match crate::helpers::s3::get_presigned_download_url(
+                s3_client,
+                &bucket,
+                &att.file_key,
+                7200,
+            )
+            .await
+            {
+                Ok(url) => url,
+                Err(e) => {
+                    eprintln!("Failed to generate presigned download URL for file_key {}: {:?}", att.file_key, e);
+                    format!("{}/{}", bucket, att.file_key)
+                }
+            };
+
+            let response = AttachmentResponse {
+                id: att.id,
+                file_name: att.file_name,
+                file_size: att.file_size,
+                file_mime: att.file_mime,
+                file_url,
+            };
+
+            message_attachments_map
+                .entry(att.message_id)
+                .or_insert_with(Vec::new)
+                .push(response);
+        }
+    }
+
+    for msg in &mut messages {
+        msg.attachments = message_attachments_map.remove(&msg.id);
+    }
+
     let members = sqlx::query_as::<_, RoomMemberInfo>(
         r#"
         SELECT 
@@ -808,6 +1094,53 @@ pub async fn get_room_messages_paginated(
     .fetch_all(db)
     .await?;
 
-    Ok(PaginatedMessages { messages, total_count, members })
+    Ok(PaginatedMessages {
+        messages,
+        total_count,
+        members,
+    })
+}
+
+/// Проверяет URL на безопасность (защита от SSRF).
+/// Разрешает только HTTP/HTTPS схемы и публичные IP-адреса.
+pub fn is_url_safe(url: &str) -> bool {
+    let parsed = match url::Url::parse(url) {
+        Ok(u) => u,
+        Err(_) => return false,
+    };
+
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return false;
+    }
+
+    let host = match parsed.host_str() {
+        Some(h) => h,
+        None => return false,
+    };
+
+    if host == "localhost" || host == "0.0.0.0" {
+        return false;
+    }
+
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return !ip.is_loopback()
+            && !ip.is_unspecified()
+            && match ip {
+                std::net::IpAddr::V4(v4) => {
+                    !v4.is_private() && !v4.is_link_local() && !v4.is_broadcast()
+                }
+                std::net::IpAddr::V6(v6) => !v6.is_loopback(),
+            };
+    }
+
+    true
+}
+
+/// Извлекает значение OG-метатега или другого атрибута из HTML по regex-паттерну.
+pub fn extract_og(html: &str, pattern: &str) -> Option<String> {
+    let re = regex::Regex::new(pattern).ok()?;
+    re.captures(html)
+        .and_then(|c| c.get(1))
+        .map(|m| html_escape::decode_html_entities(m.as_str()).into_owned())
 }
 

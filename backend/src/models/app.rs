@@ -43,6 +43,7 @@ pub struct AppState {
     pub bot_username: String,
     pub client: reqwest::Client,
     pub s3_client: aws_sdk_s3::Client,
+    pub s3_public_client: aws_sdk_s3::Client,
     pub chat_server: Arc<ChatServerState>,   
 }
 

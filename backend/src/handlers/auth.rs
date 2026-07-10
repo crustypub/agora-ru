@@ -81,9 +81,11 @@ pub async fn telegram_auth(
         }
     };
 
+    let cookie_secure = std::env::var("COOKIE_SECURE").map(|v| v == "true").unwrap_or(false);
+
     let cookie = Cookie::build("auth_token", token)
         .http_only(true)
-        .secure(true)
+        .secure(cookie_secure)
         .path("/")
         .max_age(time::Duration::days(7))
         .same_site(SameSite::Lax)
@@ -273,9 +275,11 @@ pub async fn telegram_auth_check(
             }
         };
 
+        let cookie_secure = std::env::var("COOKIE_SECURE").map(|v| v == "true").unwrap_or(false);
+
         let cookie = Cookie::build("auth_token", token)
             .http_only(true)
-            .secure(true)
+            .secure(cookie_secure)
             .path("/")
             .max_age(time::Duration::days(7))
             .same_site(SameSite::Lax)
@@ -291,9 +295,11 @@ pub async fn telegram_auth_check(
 
 #[post("/auth/logout")]
 pub async fn telegram_logout() -> impl Responder {
+    let cookie_secure = std::env::var("COOKIE_SECURE").map(|v| v == "true").unwrap_or(false);
+
     let cookie = Cookie::build("auth_token", "")
         .http_only(true)
-        .secure(true)
+        .secure(cookie_secure)
         .path("/")
         .max_age(time::Duration::seconds(0))
         .same_site(SameSite::Lax)

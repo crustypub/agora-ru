@@ -1,8 +1,10 @@
 import { computed } from 'vue';
 import { useRoute } from '#app';
+import { useChat } from './useChat';
 
 export const useNavigation = () => {
     const route = useRoute();
+    const { totalUnreadCount } = useChat();
 
     const navItems = computed(() => [
         {
@@ -22,6 +24,13 @@ export const useNavigation = () => {
             to: '/discussions',
             icon: 'material-symbols:shopping-basket-outline',
             active: route.path.startsWith('/discussions'),
+        },
+        {
+            label: 'Чаты',
+            to: '/chats',
+            icon: 'material-symbols:chat-bubble-outline',
+            active: route.path.startsWith('/chats'),
+            badge: totalUnreadCount.value > 0 ? totalUnreadCount.value : undefined
         },
         {
             label: 'О проекте',
@@ -50,6 +59,12 @@ export const useNavigation = () => {
             icon: 'material-symbols:shopping-basket-outline',
             active: route.path.startsWith('/discussions'),
         },
+        {
+            label: 'Чаты',
+            to: '/chats',
+            icon: 'material-symbols:chat-bubble-outline',
+            active: route.path.startsWith('/chats'),
+        },
     ]);
 
     return {
@@ -57,3 +72,4 @@ export const useNavigation = () => {
         quickItems,
     };
 };
+

@@ -86,5 +86,8 @@ export default defineNuxtConfig({
         // Приватные — доступны только на сервере, в браузер не утекают
         TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN,
         backendUrl: process.env.BACKEND_URL,
+        public: {
+            apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:6080',
+        }
     }
 })

@@ -1,0 +1,11 @@
+{
+  "rust-analyzer.cargo.extraEnv": {
+    "SQLX_OFFLINE": "true"
+  },
+  "rust-analyzer.check.extraEnv": {
+    "SQLX_OFFLINE": "true"
+  },
+  "files.exclude": {
+    "backend/.sqlx/**": true
+  }
+}
