@@ -203,3 +203,34 @@ pub struct AttachmentResponse {
 pub struct ParseLinkQuery {
     pub url: String,
 }
+
+#[derive(Debug, FromRow)]
+pub struct RoomRequesterInfo {
+    pub room_type: Option<String>,
+    pub requester_role: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct MemberRolesInfo {
+    pub requester_role: Option<String>,
+    pub target_role: Option<String>,
+    pub room_type: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct MessageInfoForDeletion {
+    pub sender_id: Option<Uuid>,
+    pub room_id: Uuid,
+    pub user_role: Option<String>,
+    pub is_member: bool,
+}
+
+#[derive(Debug, FromRow)]
+pub struct DbMessageAttachment {
+    pub id: Uuid,
+    pub message_id: Uuid,
+    pub file_key: String,
+    pub file_name: String,
+    pub file_size: i64,
+    pub file_mime: String,
+}

@@ -46,7 +46,7 @@ use actix_web::{FromRequest, error::InternalError, HttpResponse};
 use std::future::{ready, Ready};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use uuid::Uuid;
-use crate::handlers::auth::Claims;
+use crate::models::auth::Claims;
 use crate::models::app::AppState;
 
 pub struct AuthenticatedUser {

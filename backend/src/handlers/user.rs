@@ -1,13 +1,17 @@
-use crate::{
-    helpers::{api::{AuthenticatedUser, escape_like_pattern}, images},
-    models::{
-        app::AppState,
-        user::{GetUsersParams, UpdateUserInfoRequest, User, ShortUser},
-    },
-};
 use actix_multipart::Multipart;
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use validator::Validate;
+
+use crate::{
+    db::users::{
+        get_user_avatar_url, get_users_paginated, update_user_avatar_url, update_user_profile,
+    },
+    helpers::{api::{AuthenticatedUser, escape_like_pattern}, images},
+    models::{
+        app::AppState,
+        user::{GetUsersParams, UpdateUserInfoRequest},
+    },
+};
 
 #[get("/users")]
 pub async fn get_users(
@@ -22,42 +26,16 @@ pub async fn get_users(
         .as_ref()
         .map(|val| format!("%{}%", escape_like_pattern(val.trim())));
 
-    let users_result = sqlx::query_as::<_, ShortUser>(
-        r#"
-        SELECT
-            u.id, u.username, 
-            u.first_name, u.last_name, u.avatar_url
-        FROM users u
-        WHERE ($3::text IS NULL OR 
-               u.username ILIKE $3 ESCAPE '\' OR 
-               u.first_name ILIKE $3 ESCAPE '\' OR 
-               u.last_name ILIKE $3 ESCAPE '\')
-        ORDER BY u.username DESC
-        LIMIT $1 OFFSET $2
-        "#,
+    let result = get_users_paginated(
+        &state.pool,
+        limit,
+        offset,
+        search_pattern.as_deref(),
     )
-    .bind(limit)
-    .bind(offset)
-    .bind(&search_pattern)
-    .fetch_all(&state.pool)
     .await;
 
-    let count_result = sqlx::query_scalar::<_, i64>(
-        r#"
-        SELECT COUNT(*) 
-        FROM users u
-        WHERE ($1::text IS NULL OR 
-               u.username ILIKE $1 ESCAPE '\' OR 
-               u.first_name ILIKE $1 ESCAPE '\' OR 
-               u.last_name ILIKE $1 ESCAPE '\')
-        "#,
-    )
-    .bind(&search_pattern)
-    .fetch_one(&state.pool)
-    .await;
-
-    match (users_result, count_result) {
-        (Ok(users), Ok(total_count)) => {
+    match result {
+        Ok((users, total_count)) => {
             let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
 
             HttpResponse::Ok().json(serde_json::json!({
@@ -73,15 +51,10 @@ pub async fn get_users(
                 }
             }))
         }
-        (Err(e), _) => {
+        Err(e) => {
             eprintln!("Database error: {}", e);
             HttpResponse::InternalServerError()
                 .json(serde_json::json!({ "error": "Failed to fetch users" }))
-        }
-        (_, Err(e)) => {
-            eprintln!("Count error: {}", e);
-            HttpResponse::InternalServerError()
-                .json(serde_json::json!({ "error": "Failed to fetch users count" }))
         }
     }
 }
@@ -100,35 +73,13 @@ pub async fn update_user_info(
         );
     }
 
-    let result = sqlx::query_as::<_, User>(
-        r#"
-        UPDATE users
-        SET
-            username         = COALESCE($2, username),
-            first_name       = COALESCE($3, first_name),
-            last_name        = CASE
-                WHEN $4 IS NULL THEN last_name
-                WHEN $4 = '' THEN NULL
-                ELSE $4
-            END
-        WHERE id = $1
-        RETURNING
-            id,
-            telegram_id,
-            username,
-            first_name,
-            last_name,
-            avatar_url,
-            created_at,
-            updated_at,
-            last_login
-        "#,
+    let result = update_user_profile(
+        &state.pool,
+        author_id,
+        body.username.as_deref(),
+        body.first_name.as_deref(),
+        body.last_name.as_deref(),
     )
-    .bind(author_id)
-    .bind(&body.username)
-    .bind(&body.first_name)
-    .bind(&body.last_name)
-    .fetch_optional(&state.pool)
     .await;
 
     match result {
@@ -179,15 +130,10 @@ pub async fn upload_avatar(
         std::env::var("MINIO_BUCKET_AVATARS").expect("MINIO_BUCKET_AVATARS must be set");
 
     // Fetch current avatar from DB to delete it from S3
-    let current_avatar: Option<String> =
-        match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await
-        {
-            Ok(Some(url_opt)) => url_opt,
-            _ => None,
-        };
+    let current_avatar: Option<String> = match get_user_avatar_url(&state.pool, user.id).await {
+        Ok(url_opt) => url_opt,
+        _ => None,
+    };
 
     if let Some(old_url) = current_avatar {
         if let Some(filename) = old_url.rsplit('/').next() {
@@ -236,11 +182,7 @@ pub async fn upload_avatar(
     let avatar_url = format!("{}/{}/{}", public_endpoint, &bucket_name, &key);
 
     // Update avatar_url in the database
-    let db_result = sqlx::query("UPDATE users SET avatar_url = $1 WHERE id = $2")
-        .bind(&avatar_url)
-        .bind(user.id)
-        .execute(&state.pool)
-        .await;
+    let db_result = update_user_avatar_url(&state.pool, user.id, Some(&avatar_url)).await;
 
     match db_result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -262,15 +204,10 @@ pub async fn delete_avatar(user: AuthenticatedUser, state: web::Data<AppState>) 
         std::env::var("MINIO_BUCKET_AVATARS").expect("MINIO_BUCKET_AVATARS must be set");
 
     // Fetch current avatar from DB to delete it from S3
-    let current_avatar: Option<String> =
-        match sqlx::query_scalar::<_, Option<String>>("SELECT avatar_url FROM users WHERE id = $1")
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await
-        {
-            Ok(Some(url_opt)) => url_opt,
-            _ => None,
-        };
+    let current_avatar: Option<String> = match get_user_avatar_url(&state.pool, user.id).await {
+        Ok(url_opt) => url_opt,
+        _ => None,
+    };
 
     if let Some(old_url) = current_avatar {
         if let Some(filename) = old_url.rsplit('/').next() {
@@ -291,10 +228,7 @@ pub async fn delete_avatar(user: AuthenticatedUser, state: web::Data<AppState>) 
     }
 
     // Delete avatar_url in the database
-    let db_result = sqlx::query("UPDATE users SET avatar_url = NULL WHERE id = $1")
-        .bind(user.id)
-        .execute(&state.pool)
-        .await;
+    let db_result = update_user_avatar_url(&state.pool, user.id, None).await;
 
     match db_result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({

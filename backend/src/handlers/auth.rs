@@ -3,38 +3,17 @@ use std::collections::HashMap;
 use actix_web::cookie::{time, Cookie, SameSite};
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use uuid::Uuid;
 
+use crate::db::auth::{
+    clean_expired_tokens, create_pending_token, delete_auth_token, get_author_by_id,
+    get_auth_session,
+};
 use crate::db::users::upsert_tg_user;
+use crate::helpers::api::extract_jwt;
 use crate::helpers::telegram::verify_tg_hash;
 use crate::models::app::AppState;
-
-#[derive(Deserialize, Serialize)]
-pub struct TelegramAuthParams {
-    pub id: i64,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub username: Option<String>,
-    pub photo_url: Option<String>,
-    pub auth_date: i64,
-    pub hash: String,
-    /// Любые другие поля, которые Telegram может добавить в будущем
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Serialize)]
-pub struct AuthResponse {
-    pub token: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: Uuid,
-    pub exp: usize,
-}
+use crate::models::auth::{Claims, TelegramAuthParams, TelegramCheckRequest};
 
 #[post("/auth/telegram")]
 pub async fn telegram_auth(
@@ -101,7 +80,7 @@ pub async fn auth_me(
     req: HttpRequest,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let token = match crate::helpers::api::extract_jwt(&req) {
+    let token = match extract_jwt(&req) {
         Some(t) => t,
         None => return HttpResponse::Unauthorized().finish(),
     };
@@ -115,12 +94,7 @@ pub async fn auth_me(
         Err(_) => return HttpResponse::Unauthorized().finish(),
     };
 
-    let user = sqlx::query_as::<_, crate::models::app::Author>(
-        "SELECT id, username, first_name, last_name, avatar_url FROM users WHERE id = $1"
-    )
-    .bind(user_id)
-    .fetch_optional(&state.pool)
-    .await;
+    let user = get_author_by_id(&state.pool, user_id).await;
 
     match user {
         Ok(Some(u)) => HttpResponse::Ok().json(serde_json::json!({
@@ -135,17 +109,6 @@ pub async fn auth_me(
     }
 }
 
-#[derive(sqlx::FromRow)]
-pub struct AuthSessionRow {
-    pub telegram_id: Option<i64>,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub username: Option<String>,
-    pub photo_url: Option<String>,
-    pub auth_date: Option<i64>,
-    pub status: String,
-}
-
 #[get("/auth/telegram/request")]
 pub async fn telegram_auth_request(
     state: web::Data<AppState>,
@@ -154,13 +117,7 @@ pub async fn telegram_auth_request(
     let now = chrono::Utc::now().timestamp();
 
     // Insert new pending token
-    let result = sqlx::query(
-        "INSERT INTO auth_tokens (token, status, created_at) VALUES ($1, 'pending', $2)"
-    )
-    .bind(&token)
-    .bind(now)
-    .execute(&state.pool)
-    .await;
+    let result = create_pending_token(&state.pool, &token, now).await;
 
     match result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -174,11 +131,6 @@ pub async fn telegram_auth_request(
     }
 }
 
-#[derive(Deserialize)]
-pub struct TelegramCheckRequest {
-    pub token: String,
-}
-
 #[post("/auth/telegram/check")]
 pub async fn telegram_auth_check(
     params: web::Json<TelegramCheckRequest>,
@@ -186,20 +138,10 @@ pub async fn telegram_auth_check(
 ) -> impl Responder {
     // 1. Clean up old tokens (older than 10 mins)
     let expire_limit = chrono::Utc::now().timestamp() - 600;
-    let _ = sqlx::query("DELETE FROM auth_tokens WHERE created_at < $1")
-        .bind(expire_limit)
-        .execute(&state.pool)
-        .await;
+    let _ = clean_expired_tokens(&state.pool, expire_limit).await;
 
     // 2. Query token
-    let session = sqlx::query_as::<_, AuthSessionRow>(
-        "SELECT telegram_id, first_name, last_name, username, photo_url, auth_date, status 
-         FROM auth_tokens 
-         WHERE token = $1"
-    )
-    .bind(&params.token)
-    .fetch_optional(&state.pool)
-    .await;
+    let session = get_auth_session(&state.pool, &params.token).await;
 
     let row = match session {
         Ok(Some(r)) => r,
@@ -244,11 +186,7 @@ pub async fn telegram_auth_check(
         };
 
         // Deleting the session token so it's a one-time login
-        let _ = sqlx::query("DELETE FROM auth_tokens WHERE token = $1")
-            .bind(&params.token)
-            .execute(&state.pool)
-            .await;
-
+        let _ = delete_auth_token(&state.pool, &params.token).await;
 
         // Issue JWT
         let secret = &state.jwt_secret;
@@ -309,5 +247,3 @@ pub async fn telegram_logout() -> impl Responder {
         .cookie(cookie)
         .json(serde_json::json!({ "status": "success" }))
 }
-
-

@@ -1,13 +1,20 @@
-use crate::helpers::api::{AuthenticatedUser, MaybeAuthenticatedUser};
-use crate::models::app::AppState;
-use crate::models::post::{
-    CreatePostResponse, PostParams, PostRatingMode, PostRatingOperationType, PostRatingRequest,
-    PostResponse,
-};
-use crate::models::post::CreatePost;
 use actix_web::{get, post, web, HttpResponse, Responder};
-use crate::models::post::{CreatePostRequest, Post};
 use validator::Validate;
+
+use crate::{
+    db::posts::{
+        add_post_rating_dislike, add_post_rating_like, create_post as db_create_post,
+        get_posts_paginated, remove_post_rating_dislike, remove_post_rating_like,
+    },
+    helpers::api::{AuthenticatedUser, MaybeAuthenticatedUser},
+    models::{
+        app::AppState,
+        post::{
+            CreatePostRequest, CreatePostResponse, Post, PostParams, PostRatingMode,
+            PostRatingOperationType, PostRatingRequest, PostResponse,
+        },
+    },
+};
 
 fn get_posts_anonymous(posts: Vec<Post>, total_count: i64, params: &PostParams) -> HttpResponse {
     let limit = params.limit;
@@ -53,36 +60,10 @@ pub async fn get_posts(
     let limit = params.limit;
     let offset = params.offset();
 
-    let posts_result = sqlx::query_as::<_, Post>(
-        r#"
-        SELECT
-            p.id, p.title, p.content,
-            p.rating_plus, p.rating_minus, p.comments_count,
-            p.created_at, p.updated_at,
-            json_build_object(
-                'id', u.id,
-                'username', u.username,
-                'first_name', u.first_name,
-                'last_name', u.last_name,
-                'avatar_url', u.avatar_url
-            ) as author
-        FROM posts p
-        JOIN users u ON p.author = u.id
-        ORDER BY p.created_at DESC
-        LIMIT $1 OFFSET $2
-        "#,
-    )
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&state.pool)
-    .await;
+    let result = get_posts_paginated(&state.pool, limit, offset).await;
 
-    let count_result = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts")
-        .fetch_one(&state.pool)
-        .await;
-
-    match (posts_result, count_result) {
-        (Ok(posts), Ok(total_count)) => {
+    match result {
+        Ok((posts, total_count)) => {
             let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
 
             if let Some(author_id) = user.id {
@@ -123,15 +104,10 @@ pub async fn get_posts(
                 get_posts_anonymous(posts, total_count, &params)
             }
         }
-        (Err(e), _) => {
-            eprintln!("Database error: {}", e);
+        Err(e) => {
+            eprintln!("Database error fetching posts: {}", e);
             HttpResponse::InternalServerError()
                 .json(serde_json::json!({ "error": "Failed to fetch posts" }))
-        }
-        (_, Err(e)) => {
-            eprintln!("Count error: {}", e);
-            HttpResponse::InternalServerError()
-                .json(serde_json::json!({ "error": "Failed to fetch posts count" }))
         }
     }
 }
@@ -149,28 +125,7 @@ pub async fn create_post(
             .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
     }
 
-    // 3. Создаём пост, подставляя author из токена
-    let result = sqlx::query_as::<_, CreatePost>(
-        r#"
-        INSERT INTO posts (author, title, content)
-        VALUES ($1, $2, $3)
-        RETURNING
-            id,
-            author,
-            title,
-            content,
-            rating_plus,
-            rating_minus,
-            comments_count,
-            created_at,
-            updated_at
-        "#,
-    )
-    .bind(author_id)
-    .bind(&params.title)
-    .bind(&params.content)
-    .fetch_one(&state.pool)
-    .await;
+    let result = db_create_post(&state.pool, author_id, &params.title, &params.content).await;
 
     match result {
         Ok(post) => {
@@ -204,157 +159,44 @@ pub async fn post_rating_update(
 ) -> impl Responder {
     let author_id = user.id;
 
-    match params.operation_type {
-        PostRatingOperationType::Add => {
-            match params.mode {
-                PostRatingMode::Increment => {
-                    let result = sqlx::query(
-                        r#"
-                UPDATE posts
-                SET
-                    rating_plus = array_append(array_remove(rating_plus, $1), $1),
-                    rating_minus = array_remove(rating_minus, $1)
-                WHERE id = $2
-            "#,
-                    )
-                    .bind(author_id)
-                    .bind(params.post_id)
-                    .execute(&state.pool)
-                    .await;
-                    match result {
-                        Ok(rows_affected) => {
-                            if rows_affected.rows_affected() == 0 {
-                                HttpResponse::NotFound().json(serde_json::json!({
-                                    "status": "error",
-                                    "error": "Post not found",
-                                    "post_id": params.post_id.to_string()
-                                }))
-                            } else {
-                                HttpResponse::Ok().json(serde_json::json!({
-                                    "status": "success",
-                                }))
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Database error: {}", e);
-                            HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post rating"
-                            }))
-                        }
-                    }
-                }
-                PostRatingMode::Decrement => {
-                    let result = sqlx::query(
-                        r#"
-                UPDATE posts
-                SET
-                    rating_minus = array_append(array_remove(rating_minus, $1), $1),
-                    rating_plus = array_remove(rating_plus, $1)
-                WHERE id = $2
-            "#,
-                    )
-                    .bind(author_id)
-                    .bind(params.post_id)
-                    .execute(&state.pool)
-                    .await;
-                    match result {
-                        Ok(rows_affected) => {
-                            if rows_affected.rows_affected() == 0 {
-                                HttpResponse::NotFound().json(serde_json::json!({
-                                    "status": "error",
-                                    "error": "Post not found",
-                                    "post_id": params.post_id.to_string()
-                                }))
-                            } else {
-                                HttpResponse::Ok().json(serde_json::json!({
-                                    "status": "success",
-                                }))
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Database error: {}", e);
-                            HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post rating"
-                            }))
-                        }
-                    }
-                }
+    let db_res = match params.operation_type {
+        PostRatingOperationType::Add => match params.mode {
+            PostRatingMode::Increment => {
+                add_post_rating_like(&state.pool, params.post_id, author_id).await
+            }
+            PostRatingMode::Decrement => {
+                add_post_rating_dislike(&state.pool, params.post_id, author_id).await
+            }
+        },
+        PostRatingOperationType::Remove => match params.mode {
+            PostRatingMode::Increment => {
+                remove_post_rating_like(&state.pool, params.post_id, author_id).await
+            }
+            PostRatingMode::Decrement => {
+                remove_post_rating_dislike(&state.pool, params.post_id, author_id).await
+            }
+        },
+    };
+
+    match db_res {
+        Ok(rows_affected) => {
+            if rows_affected == 0 {
+                HttpResponse::NotFound().json(serde_json::json!({
+                    "status": "error",
+                    "error": "Post not found",
+                    "post_id": params.post_id.to_string()
+                }))
+            } else {
+                HttpResponse::Ok().json(serde_json::json!({
+                    "status": "success",
+                }))
             }
         }
-
-        PostRatingOperationType::Remove => {
-            match params.mode {
-                PostRatingMode::Increment => {
-                    let result = sqlx::query(
-                        r#"
-                        UPDATE posts
-                        SET
-                            rating_plus = array_remove(rating_plus, $1)
-                        WHERE id = $2
-                    "#,
-                    )
-                    .bind(author_id)
-                    .bind(params.post_id)
-                    .execute(&state.pool)
-                    .await;
-                    match result {
-                        Ok(rows_affected) => {
-                            if rows_affected.rows_affected() == 0 {
-                                HttpResponse::NotFound().json(serde_json::json!({
-                                    "status": "error",
-                                    "error": "Post not found",
-                                    "post_id": params.post_id.to_string()
-                                }))
-                            } else {
-                                HttpResponse::Ok().json(serde_json::json!({
-                                    "status": "success",
-                                }))
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Database error: {}", e);
-                            HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post rating"
-                            }))
-                        }
-                    }
-                }
-                PostRatingMode::Decrement => {
-                    let result = sqlx::query(
-                        r#"
-                        UPDATE posts
-                        SET
-                            rating_minus = array_remove(rating_minus, $1)
-                        WHERE id = $2
-                    "#,
-                    )
-                    .bind(author_id)
-                    .bind(params.post_id)
-                    .execute(&state.pool)
-                    .await;
-                    match result {
-                        Ok(rows_affected) => {
-                            if rows_affected.rows_affected() == 0 {
-                                HttpResponse::NotFound().json(serde_json::json!({
-                                    "status": "error",
-                                    "error": "Post not found",
-                                    "post_id": params.post_id.to_string()
-                                }))
-                            } else {
-                                HttpResponse::Ok().json(serde_json::json!({
-                                    "status": "success",
-                                }))
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Database error: {}", e);
-                            HttpResponse::InternalServerError().json(serde_json::json!({
-                                "error": "Failed to update post rating"
-                            }))
-                        }
-                    }
-                }
-            }
+        Err(e) => {
+            eprintln!("Database error updating post rating: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to update post rating"
+            }))
         }
     }
 }

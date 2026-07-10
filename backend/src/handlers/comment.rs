@@ -1,9 +1,18 @@
-use crate::helpers::api::AuthenticatedUser;
-use crate::models::app::AppState;
-use crate::models::comment::{CommentParams, CommentResponse, CreateCommentRequest, UpdateCommentRequest, Comment};
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use uuid::Uuid;
 use validator::Validate;
+
+use crate::{
+    db::comments::{
+        create_comment as db_create_comment, delete_comment as db_delete_comment,
+        get_comment_author, get_comments_paginated, update_comment as db_update_comment,
+    },
+    helpers::api::AuthenticatedUser,
+    models::{
+        app::AppState,
+        comment::{CommentParams, CreateCommentRequest, UpdateCommentRequest},
+    },
+};
 
 #[get("/comments")]
 pub async fn get_comments(
@@ -15,46 +24,17 @@ pub async fn get_comments(
     let entity_type = &params.entity_type;
     let entity_id = params.entity_id;
 
-    let comments_result = sqlx::query_as::<_, CommentResponse>(
-        r#"
-        SELECT
-            c.id,
-            c.entity_type,
-            c.entity_id,
-            c.content,
-            c.created_at,
-            c.updated_at,
-            json_build_object(
-                'id',         u.id,
-                'username',   u.username,
-                'first_name', u.first_name,
-                'last_name',  u.last_name,
-                'avatar_url', u.avatar_url
-            ) AS author
-        FROM comments c
-        JOIN users u ON c.author = u.id
-        WHERE c.entity_type = $1 AND c.entity_id = $2
-        ORDER BY c.created_at DESC
-        LIMIT $3 OFFSET $4
-        "#,
+    let result = get_comments_paginated(
+        &state.pool,
+        entity_type,
+        entity_id,
+        limit,
+        offset,
     )
-    .bind(entity_type)
-    .bind(entity_id)
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&state.pool)
     .await;
 
-    let count_result = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM comments WHERE entity_type = $1 AND entity_id = $2",
-    )
-    .bind(entity_type)
-    .bind(entity_id)
-    .fetch_one(&state.pool)
-    .await;
-
-    match (comments_result, count_result) {
-        (Ok(rows), Ok(total_count)) => {
+    match result {
+        Ok((rows, total_count)) => {
             let total_pages = (total_count as f64 / limit as f64).ceil() as i64;
 
             HttpResponse::Ok().json(serde_json::json!({
@@ -70,15 +50,10 @@ pub async fn get_comments(
                 }
             }))
         }
-        (Err(e), _) => {
+        Err(e) => {
             eprintln!("Database error fetching comments: {}", e);
             HttpResponse::InternalServerError()
                 .json(serde_json::json!({ "error": "Failed to fetch comments" }))
-        }
-        (_, Err(e)) => {
-            eprintln!("Count error: {}", e);
-            HttpResponse::InternalServerError()
-                .json(serde_json::json!({ "error": "Failed to fetch comments count" }))
         }
     }
 }
@@ -96,21 +71,16 @@ pub async fn create_comment(
             .json(serde_json::json!({ "error": "Validation failed", "details": errors.to_string() }));
     }
 
-    let comment_create_result = sqlx::query_as::<_, Comment>(
-        r#"
-        INSERT INTO comments (entity_type, entity_id, author, content)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, entity_type, entity_id, author, content, created_at, updated_at
-        "#,
+    let result = db_create_comment(
+        &state.pool,
+        author_id,
+        &params.entity_type,
+        params.entity_id,
+        &params.content,
     )
-    .bind(&params.entity_type)
-    .bind(params.entity_id)
-    .bind(author_id)
-    .bind(&params.content)
-    .fetch_one(&state.pool)
     .await;
 
-    match comment_create_result {
+    match result {
         Ok(comment) => {
             HttpResponse::Ok().json(serde_json::json!({
                 "status": "success",
@@ -141,27 +111,11 @@ pub async fn edit_comment(
     }
 
     // Verify ownership
-    let ownership_check = sqlx::query_scalar::<_, Uuid>(
-        "SELECT author FROM comments WHERE id = $1",
-    )
-    .bind(comment_id)
-    .fetch_optional(&state.pool)
-    .await;
+    let ownership_check = get_comment_author(&state.pool, comment_id).await;
 
     match ownership_check {
         Ok(Some(owner)) if owner == author_id => {
-            let update_result = sqlx::query_as::<_, Comment>(
-                r#"
-                UPDATE comments
-                SET content = $1
-                WHERE id = $2
-                RETURNING id, entity_type, entity_id, author, content, created_at, updated_at
-                "#,
-            )
-            .bind(&params.content)
-            .bind(comment_id)
-            .fetch_one(&state.pool)
-            .await;
+            let update_result = db_update_comment(&state.pool, comment_id, &params.content).await;
 
             match update_result {
                 Ok(comment) => HttpResponse::Ok().json(serde_json::json!({
@@ -197,21 +151,11 @@ pub async fn delete_comment(
     let author_id = user.id;
 
     // Verify ownership
-    let ownership_check = sqlx::query_scalar::<_, Uuid>(
-        "SELECT author FROM comments WHERE id = $1",
-    )
-    .bind(comment_id)
-    .fetch_optional(&state.pool)
-    .await;
+    let ownership_check = get_comment_author(&state.pool, comment_id).await;
 
     match ownership_check {
         Ok(Some(owner)) if owner == author_id => {
-            let delete_result = sqlx::query(
-                "DELETE FROM comments WHERE id = $1",
-            )
-            .bind(comment_id)
-            .execute(&state.pool)
-            .await;
+            let delete_result = db_delete_comment(&state.pool, comment_id).await;
 
             match delete_result {
                 Ok(_) => HttpResponse::Ok().json(serde_json::json!({

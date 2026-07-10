@@ -3,7 +3,7 @@ use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH}; // Добавили для работы со временем
 
-use crate::handlers::auth::TelegramAuthParams;
+use crate::models::auth::TelegramAuthParams;
 
 type HmacSha256 = Hmac<Sha256>;
 

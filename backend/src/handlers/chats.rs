@@ -1,8 +1,10 @@
+use actix_multipart::Multipart;
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
+    db::chats::{check_is_room_member, get_room_member_ids},
     helpers::{
         api::AuthenticatedUser,
         chats::{ChatError, MessageDeletionResult::EveryoneDeleted, create_direct_room, is_url_safe, extract_og},
@@ -140,7 +142,6 @@ pub async fn get_room_messages(
         }
     })))
 }
-
 
 /// Создает новую комнату.
 /// Поддерживает создание как личных (direct), так и групповых (group) чатов.
@@ -289,13 +290,7 @@ pub async fn delete_message(
 
     // Если удалили для всех, рассылаем уведомление по WebSocket
     if let EveryoneDeleted { room_id } = result {
-        if let Ok(members) = sqlx::query!(
-            "SELECT user_id FROM room_members WHERE room_id = $1",
-            room_id
-        )
-        .fetch_all(&state.pool)
-        .await
-        {
+        if let Ok(members) = get_room_member_ids(&state.pool, room_id).await {
             let notification = MessageDeletedNotification {
                 message_id,
                 room_id,
@@ -306,19 +301,16 @@ pub async fn delete_message(
                 payload: serde_json::to_value(notification).unwrap(),
             };
 
-            for member in members {
+            for member_id in members {
                 state
                     .chat_server
-                    .send_to_user(&member.user_id, ws_msg.clone());
+                    .send_to_user(&member_id, ws_msg.clone());
             }
         }
     }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "status": "success" })))
 }
-
-
-use actix_multipart::Multipart;
 
 #[derive(serde::Deserialize)]
 pub struct UploadQuery {
@@ -333,14 +325,9 @@ pub async fn upload_file(
     state: web::Data<AppState>,
 ) -> Result<impl Responder, ChatError> {
     // Проверяем, состоит ли пользователь в этой комнате
-    let is_member = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2) as \"exists!\"",
-        query.room_id,
-        user.id
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map_err(ChatError::Database)?;
+    let is_member = check_is_room_member(&state.pool, query.room_id, user.id)
+        .await
+        .map_err(ChatError::Database)?;
 
     if !is_member {
         return Err(ChatError::Forbidden("You do not have access to this room".to_string()));
@@ -406,7 +393,6 @@ pub async fn upload_file(
     })))
 }
 
-
 #[get("/chats/parse-link")]
 pub async fn parse_link(
     query: web::Query<ParseLinkQuery>,
@@ -453,7 +439,6 @@ pub async fn parse_link(
         }
     };
     let html = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_BYTES)]);
-
 
     let title = extract_og(
         &html,
