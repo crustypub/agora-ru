@@ -3,9 +3,16 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    helpers::{api::AuthenticatedUser, chats::{ChatError, MessageDeletionResult::EveryoneDeleted, create_direct_room}}, models::{
-        app::AppState, chat::{
-            AddMemberRequest, ChatListItemResponse, ChatMessageResponse, ChatRoomType, CreateChatRoomRequest, DeleteMessageQuery, MessageDeletedNotification, RoomsParams, WsMessage,
+    helpers::{
+        api::AuthenticatedUser,
+        chats::{ChatError, MessageDeletionResult::EveryoneDeleted, create_direct_room, is_url_safe, extract_og},
+    },
+    models::{
+        app::AppState,
+        chat::{
+            AddMemberRequest, ChatListItemResponse, ChatMessageResponse, ChatRoomType,
+            CreateChatRoomRequest, DeleteMessageQuery, MessageDeletedNotification,
+            ParseLinkQuery, RoomsParams, WsMessage,
         },
     },
 };
@@ -397,4 +404,112 @@ pub async fn upload_file(
             "file_size": file_size
         }
     })))
+}
+
+
+#[get("/chats/parse-link")]
+pub async fn parse_link(
+    query: web::Query<ParseLinkQuery>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let url = query.url.trim().to_string();
+
+    if !is_url_safe(&url) {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "message": "Invalid or disallowed URL"
+        }));
+    }
+
+    let response = state
+        .client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(4))
+        .header("User-Agent", "Mozilla/5.0 (compatible; AgoraBot/1.0; +https://agora.ru)")
+        .header("Accept", "text/html,application/xhtml+xml")
+        .send()
+        .await;
+
+    let resp = match response {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("parse-link fetch error for {}: {}", url, e);
+            return HttpResponse::BadGateway().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to fetch URL"
+            }));
+        }
+    };
+
+    // Читаем не более 256 КБ, чтобы не тащить тяжёлые страницы целиком
+    const MAX_BYTES: usize = 256 * 1024;
+    let bytes = match resp.bytes().await {
+        Ok(b) => b,
+        Err(_) => {
+            return HttpResponse::BadGateway().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to read response body"
+            }));
+        }
+    };
+    let html = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_BYTES)]);
+
+
+    let title = extract_og(
+        &html,
+        r#"(?i)<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']"#,
+    )
+    .or_else(|| {
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']"#,
+        )
+    })
+    .or_else(|| extract_og(&html, r#"(?i)<title[^>]*>([^<]+)</title>"#));
+
+    let title = match title {
+        Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+        _ => {
+            return HttpResponse::Ok().json(serde_json::json!({
+                "status": "error",
+                "message": "No title found"
+            }));
+        }
+    };
+
+    let description = extract_og(
+        &html,
+        r#"(?i)<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']"#,
+    )
+    .or_else(|| {
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']"#,
+        )
+    })
+    .or_else(|| {
+        // Фоллбэк на meta description
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']"#,
+        )
+    });
+
+    let image_url = extract_og(
+        &html,
+        r#"(?i)<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']"#,
+    )
+    .or_else(|| {
+        extract_og(
+            &html,
+            r#"(?i)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']"#,
+        )
+    });
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "url": url,
+        "title": title,
+        "description": description,
+        "image_url": image_url,
+    }))
 }

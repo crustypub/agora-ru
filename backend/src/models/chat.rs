@@ -196,5 +196,10 @@ pub struct AttachmentResponse {
     pub file_name: String,
     pub file_size: i64,
     pub file_mime: String,
-    pub file_url: String, 
+    pub file_url: String,
+}
+
+#[derive(Deserialize)]
+pub struct ParseLinkQuery {
+    pub url: String,
 }

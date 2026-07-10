@@ -1100,3 +1100,47 @@ pub async fn get_room_messages_paginated(
         members,
     })
 }
+
+/// Проверяет URL на безопасность (защита от SSRF).
+/// Разрешает только HTTP/HTTPS схемы и публичные IP-адреса.
+pub fn is_url_safe(url: &str) -> bool {
+    let parsed = match url::Url::parse(url) {
+        Ok(u) => u,
+        Err(_) => return false,
+    };
+
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return false;
+    }
+
+    let host = match parsed.host_str() {
+        Some(h) => h,
+        None => return false,
+    };
+
+    if host == "localhost" || host == "0.0.0.0" {
+        return false;
+    }
+
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return !ip.is_loopback()
+            && !ip.is_unspecified()
+            && match ip {
+                std::net::IpAddr::V4(v4) => {
+                    !v4.is_private() && !v4.is_link_local() && !v4.is_broadcast()
+                }
+                std::net::IpAddr::V6(v6) => !v6.is_loopback(),
+            };
+    }
+
+    true
+}
+
+/// Извлекает значение OG-метатега или другого атрибута из HTML по regex-паттерну.
+pub fn extract_og(html: &str, pattern: &str) -> Option<String> {
+    let re = regex::Regex::new(pattern).ok()?;
+    re.captures(html)
+        .and_then(|c| c.get(1))
+        .map(|m| html_escape::decode_html_entities(m.as_str()).into_owned())
+}
+
