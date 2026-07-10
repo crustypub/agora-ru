@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO room_members (room_id, user_id, role)\n        VALUES ($1, $2, $3::room_role)\n        ON CONFLICT (room_id, user_id) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "room_role",
+            "kind": {
+              "Enum": [
+                "owner",
+                "moderator",
+                "member"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7e4ee78a5c9515c62e35f21483d29cbe9fef83ce0b7d227184214fee76faa160"
+}

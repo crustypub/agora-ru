@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE room_members SET last_read_at = NOW() \n                     WHERE room_id = $1 AND user_id = $2\n                     RETURNING EXTRACT(EPOCH FROM last_read_at)::BIGINT as \"last_read_at!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_read_at!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2465e02cc5595994e04f9d63015ad82612c907e29ab3937f22bab1fb831c0135"
+}

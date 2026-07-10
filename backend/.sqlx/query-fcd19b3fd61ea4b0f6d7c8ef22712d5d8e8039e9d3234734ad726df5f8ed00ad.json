@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as \"count!\"\n        FROM rooms r\n        JOIN room_members rm ON r.id = rm.room_id\n        WHERE rm.user_id = $1\n          AND (\n              $2::text IS NULL OR (\n                  r.name ILIKE $2 OR\n                  (\n                      r.type = 'direct' AND EXISTS (\n                          SELECT 1 FROM room_members orm\n                          JOIN users ou ON orm.user_id = ou.id\n                          WHERE orm.room_id = r.id AND orm.user_id != $1\n                            AND (\n                                ou.username ILIKE $2 OR\n                                ou.first_name ILIKE $2 OR\n                                ou.last_name ILIKE $2\n                            )\n                      )\n                  )\n              )\n          )\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "fcd19b3fd61ea4b0f6d7c8ef22712d5d8e8039e9d3234734ad726df5f8ed00ad"
+}

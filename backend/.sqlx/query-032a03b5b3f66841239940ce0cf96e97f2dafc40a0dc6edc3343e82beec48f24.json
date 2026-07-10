@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO rooms (type, direct_key)\n        VALUES ($1::room_type, $2)\n        ON CONFLICT (direct_key) DO UPDATE SET updated_at = NOW()\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "room_type",
+            "kind": {
+              "Enum": [
+                "direct",
+                "group"
+              ]
+            }
+          }
+        },
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "032a03b5b3f66841239940ce0cf96e97f2dafc40a0dc6edc3343e82beec48f24"
+}

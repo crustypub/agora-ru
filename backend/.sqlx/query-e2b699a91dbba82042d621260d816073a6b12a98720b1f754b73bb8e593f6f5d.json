@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as \"count!\"\n        FROM messages m\n        WHERE m.room_id = $1\n          AND m.deleted_at IS NULL\n          AND NOT EXISTS (\n              SELECT 1 FROM deleted_messages dm\n              WHERE dm.message_id = m.id AND dm.user_id = $2\n          )\n          AND ($3::text IS NULL OR m.content ILIKE $3)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e2b699a91dbba82042d621260d816073a6b12a98720b1f754b73bb8e593f6f5d"
+}
