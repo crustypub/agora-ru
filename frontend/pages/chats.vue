@@ -278,6 +278,7 @@ onUnmounted(() => {
   &__area {
     flex: 1;
     height: 100%;
+    min-width: 0;
   }
 }
 </style>

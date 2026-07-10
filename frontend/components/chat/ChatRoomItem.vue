@@ -48,7 +48,7 @@
 import { computed } from 'vue';
 import type { IChatListItem } from '~/models/entities/chat.entities';
 import { useAuthUser } from '~/composables/useAuthUser';
-import { formatUserName, formatRoomTime } from '~/helpers/chat';
+import { formatUserName, formatRoomTime, stripLinkPreview } from '~/helpers/chat';
 
 const props = defineProps<{
   room: IChatListItem;
@@ -84,7 +84,7 @@ const avatarUrl = computed(() => {
 // Last message text preview
 const lastMessageText = computed(() => {
   if (!props.room.last_message) return 'Сообщений нет';
-  return props.room.last_message.content;
+  return stripLinkPreview(props.room.last_message.content);
 });
 
 // Check if last message is sent by current user

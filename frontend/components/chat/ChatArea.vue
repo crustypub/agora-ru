@@ -121,6 +121,34 @@
         </div>
       </div>
 
+      <div v-if="draftPreview || isPreviewLoading" class="chat-area__draft-preview">
+        <div v-if="isPreviewLoading" class="chat-area__draft-preview-loader">
+          <UIcon name="material-symbols:sync" class="chat-area__spinner" />
+          <span>Загрузка превью...</span>
+        </div>
+        <template v-else-if="draftPreview">
+          <img
+            v-if="draftPreview.img"
+            :src="draftPreview.img"
+            class="chat-area__draft-preview-img"
+            :alt="draftPreview.title"
+          />
+          <div class="chat-area__draft-preview-info">
+            <span class="chat-area__draft-preview-title">{{ draftPreview.title }}</span>
+            <span v-if="draftPreview.desc" class="chat-area__draft-preview-desc">{{ draftPreview.desc }}</span>
+          </div>
+          <UButton
+            icon="material-symbols:close"
+            variant="ghost"
+            color="neutral"
+            size="xs"
+            class="chat-area__draft-preview-close"
+            title="Убрать превью"
+            @click="dismissPreview"
+          />
+        </template>
+      </div>
+
       <div class="chat-area__input-bar">
         <UButton
           icon="material-symbols:attach-file"
@@ -172,7 +200,8 @@ import { useAuthUser } from '~/composables/useAuthUser';
 import { useNotify } from '~/composables/useNotify';
 import { useApiCall } from '~/composables/useApi';
 import type { IChatMessage } from '~/models/entities/chat.entities';
-import { formatDateDivider, formatUserName } from '~/helpers/chat';
+import { formatDateDivider, formatUserName, extractFirstUrl, encodeMessageContent } from '~/helpers/chat';
+import type { ILinkPreviewData } from '~/helpers/chat';
 import ChatMessageItem from './ChatMessageItem.vue';
 import ChatDetailsModal from './ChatDetailsModal.vue';
 
@@ -297,6 +326,53 @@ const formatBytes = (bytes: number, decimals = 2) => {
 const feedContainer = ref<HTMLElement | null>(null);
 const inputText = ref('');
 const isDetailsModalOpen = ref(false);
+
+const draftPreview = ref<ILinkPreviewData | null>(null);
+const isPreviewLoading = ref(false);
+const lastFetchedUrl = ref<string | null>(null);
+let previewDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const dismissPreview = () => {
+  draftPreview.value = null;
+  lastFetchedUrl.value = null;
+};
+
+const fetchLinkPreview = async (url: string) => {
+  if (url === lastFetchedUrl.value) return;
+  lastFetchedUrl.value = url;
+  isPreviewLoading.value = true;
+  draftPreview.value = null;
+  try {
+    const res = await useApiCall<{ url: string; title: string; description?: string; image_url?: string }>(
+      '/api/chats/parse-link',
+      { query: { url } }
+    );
+    if (res?.title) {
+      draftPreview.value = {
+        url: res.url,
+        title: res.title,
+        desc: res.description,
+        img: res.image_url,
+      };
+    }
+  } catch {
+    // Превью не загрузилось — тихо игнорируем
+  } finally {
+    isPreviewLoading.value = false;
+  }
+};
+
+watch(inputText, (text) => {
+  if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
+  const url = extractFirstUrl(text);
+  if (!url) {
+    // Текст очищён — сбрасываем превью
+    if (!text.trim()) dismissPreview();
+    isPreviewLoading.value = false;
+    return;
+  }
+  previewDebounceTimer = setTimeout(() => fetchLinkPreview(url), 600);
+});
 
 const currentRoom = computed(() => rooms.value.find(r => r.id === activeRoomId.value) || null);
 const isDirect = computed(() => currentRoom.value?.room_type === 'direct');
@@ -447,10 +523,13 @@ const handleSendMessage = () => {
     file_mime: f.mime
   }));
 
-  sendMessage(text, attachmentsPayload);
+  const content = encodeMessageContent(text, draftPreview.value);
+  sendMessage(content, attachmentsPayload);
   
   inputText.value = '';
   attachedFiles.value = [];
+  draftPreview.value = null;
+  lastFetchedUrl.value = null;
 };
 
 // Enter — отправить, Shift+Enter — перенос строки (нативное поведение textarea)
@@ -652,6 +731,62 @@ const handleEnterKey = (e: KeyboardEvent) => {
     background-color: var(--ui-bg-elevated);
     max-height: 150px;
     overflow-y: auto;
+  }
+
+  &__draft-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--ui-border);
+    background-color: var(--ui-bg-elevated);
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
+  &__draft-preview-loader {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+  }
+
+  &__draft-preview-img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  &__draft-preview-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  &__draft-preview-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ui-text-highlighted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__draft-preview-desc {
+    font-size: 0.6875rem;
+    color: var(--ui-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__draft-preview-close {
+    flex-shrink: 0;
   }
 
   &__attached-item {

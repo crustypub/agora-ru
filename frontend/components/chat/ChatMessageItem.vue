@@ -39,9 +39,31 @@
           </UDropdownMenu>
         </div>
 
-        <div class="message-item__text">
-          {{ message.content }}
-        </div>
+        <div
+          class="message-item__text"
+          v-html="renderText(parsedContent.text)"
+        />
+
+        <a
+          v-if="parsedContent.preview"
+          :href="parsedContent.preview.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="message-item__preview-card"
+        >
+          <div class="message-item__preview-body">
+            <span class="message-item__preview-title">{{ parsedContent.preview.title }}</span>
+            <span v-if="parsedContent.preview.desc" class="message-item__preview-desc">{{ parsedContent.preview.desc }}</span>
+            <span class="message-item__preview-url">{{ parsedContent.preview.url }}</span>
+          </div>
+          <img
+            v-if="parsedContent.preview.img"
+            :src="parsedContent.preview.img"
+            class="message-item__preview-thumb"
+            :alt="parsedContent.preview.title"
+            loading="lazy"
+          />
+        </a>
 
         <div 
           v-if="mediaAttachments.length > 0" 
@@ -108,7 +130,7 @@ import { ref, computed } from 'vue';
 import type { IChatMessage } from '~/models/entities/chat.entities';
 import { useNotify } from '~/composables/useNotify';
 import ChatMediaLightbox from './ChatMediaLightbox.vue';
-import { formatUserName, formatMessageTime } from '~/helpers/chat';
+import { formatUserName, formatMessageTime, parseMessageContent } from '~/helpers/chat';
 
 const props = defineProps<{
   message: IChatMessage;
@@ -159,9 +181,34 @@ const dropdownItems = computed(() => {
   return [items];
 });
 
+// Вычисляем парсинг один раз реактивно
+const parsedContent = computed(() => parseMessageContent(props.message.content));
+
+/**
+ * Рендерит текст сообщения в HTML:
+ * — экранирует HTML-символы (XSS-защита)
+ * — оборачивает URL в кликабельные теги <a>
+ * — сохраняет переносы строк через white-space: pre-wrap
+ */
+const renderText = (text: string): string => {
+  if (!text) return '';
+  // Экранируем HTML символы до обработки URL
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  // Оборачиваем URL в кликабельные ссылки
+  return escaped.replace(
+    /(https?:\/\/[^\s<>"]+)/g,
+    (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="message-item__link">${url}</a>`
+  );
+};
+
 const copyText = async () => {
   try {
-    await navigator.clipboard.writeText(props.message.content);
+    // Копируем только чистый текст, без JSON-метаданных превью
+    await navigator.clipboard.writeText(parsedContent.value.text);
     notify.success('Скопировано в буфер обмена');
   } catch (err) {
     console.error('Failed to copy message:', err);
@@ -213,6 +260,7 @@ const openMediaLightbox = (index: number) => {
   gap: 0.5rem;
   max-width: 80%;
   margin: 0.375rem 0;
+  min-width: 0;
 
   &--me {
     align-self: flex-end;
@@ -236,6 +284,7 @@ const openMediaLightbox = (index: number) => {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
+    min-width: 0;
   }
 
   &__sender-name {
@@ -253,7 +302,8 @@ const openMediaLightbox = (index: number) => {
     user-select: text;
     white-space: pre-wrap;
     word-break: break-word;
-    min-width: 120px;
+    overflow-wrap: anywhere;
+    min-width: 0;
     max-width: 100%;
 
     &--me {
@@ -295,6 +345,9 @@ const openMediaLightbox = (index: number) => {
   &__text {
     padding-right: 1.5rem;
     font-weight: 400;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
 
   &__time-wrapper {
@@ -456,6 +509,105 @@ const openMediaLightbox = (index: number) => {
     gap: 0.375rem;
     margin-top: 0.5rem;
     margin-right: 1.5rem;
+  }
+
+  // Кликабельные ссылки в тексте сообщения
+  &__link {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-all;
+    transition: opacity 0.15s ease;
+
+    .message-item__bubble--me & {
+      color: rgba(255, 255, 255, 0.9);
+      &:hover { opacity: 0.75; }
+    }
+
+    .message-item__bubble--other & {
+      color: var(--ui-primary);
+      &:hover { opacity: 0.75; }
+    }
+  }
+
+  // Превью-карточка: горизонтальная компоновка с левой акцентной полосой
+  &__preview-card {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    margin-top: 0.5rem;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+    min-width: 0;
+
+    .message-item__bubble--me & {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .message-item__bubble--other & {
+      background-color: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+    }
+
+    &:hover {
+      opacity: 0.82;
+    }
+  }
+
+  &__preview-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.5rem 0.625rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__preview-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+
+    .message-item__bubble--me & { color: #fff; }
+    .message-item__bubble--other & { color: var(--ui-text-highlighted); }
+  }
+
+  &__preview-desc {
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+
+    .message-item__bubble--me & { color: rgba(255, 255, 255, 0.75); }
+    .message-item__bubble--other & { color: var(--ui-text-muted); }
+  }
+
+  &__preview-url {
+    font-size: 0.625rem;
+    margin-top: 0.125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    .message-item__bubble--me & { color: rgba(255, 255, 255, 0.5); }
+    .message-item__bubble--other & { color: var(--ui-primary); }
+  }
+
+  // Миниатюрное изображение справа
+  &__preview-thumb {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: block;
+    align-self: stretch;
   }
 }
 </style>
