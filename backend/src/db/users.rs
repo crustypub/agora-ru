@@ -39,7 +39,7 @@ pub async fn get_users_paginated(
 ) -> Result<(Vec<ShortUser>, i64), sqlx::Error> {
     let users = sqlx::query_as::<_, ShortUser>(
         r#"
-        SELECT id, username, first_name, last_name, avatar_url
+        SELECT id, username, first_name, last_name, avatar_url, description
         FROM users
         WHERE ($3::text IS NULL OR 
                username ILIKE $3 ESCAPE '\' OR 
