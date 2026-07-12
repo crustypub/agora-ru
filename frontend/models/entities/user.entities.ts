@@ -1,4 +1,4 @@
-export interface IUserResponse {
+export interface IUser {
   id: string;
   username: string;
   first_name: string | null;
@@ -6,4 +6,5 @@ export interface IUserResponse {
   avatar_url: string | null;
   telegram_id: number | null;
   created_at: number;
+  description?: string
 }

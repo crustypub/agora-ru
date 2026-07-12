@@ -1,5 +1,11 @@
 <template>
-  <UCard class="filters-bar-card" :ui="{ body: 'p-3 sm:p-4' }">
+  <UCard
+    class="filters-bar-card"
+    :ui="{
+      root: isSimple ? '!bg-transparent !ring-0' : '',
+      body: isSimple ? '!p-0' : 'p-3 sm:p-4'
+    }"
+  >
     <div class="filters-bar">
       <div class="filters-bar__left">
         <UInput
@@ -74,6 +80,7 @@ interface IProps {
   showSearch?: boolean;
   searchPlaceholder?: string;
   hasActiveFilters?: boolean;
+  isSimple?: boolean;
 }
 
 const {
@@ -81,6 +88,7 @@ const {
   showSearch = true,
   searchPlaceholder = 'Поиск...',
   hasActiveFilters = false,
+  isSimple = false,
 } = defineProps<IProps>();
 
 const emit = defineEmits<{
@@ -88,11 +96,13 @@ const emit = defineEmits<{
 }>();
 
 const searchModel = defineModel<string>('search', { default: '' });
-const sortByModel = defineModel<string>('sortBy', { required: true });
-const sortOrderModel = defineModel<SortOrder>('sortOrder', { required: true });
+const sortByModel = defineModel<string>('sortBy', { required: false });
+const sortOrderModel = defineModel<SortOrder>('sortOrder', { required: false });
 
 function toggleSortOrder() {
-  sortOrderModel.value = sortOrderModel.value === 'asc' ? 'desc' : 'asc';
+  if (sortOrderModel.value) {
+    sortOrderModel.value = sortOrderModel.value === 'asc' ? 'desc' : 'asc';
+  }
 }
 </script>
 
