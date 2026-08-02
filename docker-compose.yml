@@ -79,6 +79,17 @@ services:
       - RUSTFLAGS=-C link-arg=-fuse-ld=mold
       - DATABASE_URL=postgresql://${DB_USER:?DB_USER is required}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME:?DB_NAME is required}
     command: sh -c "find /app/src -name '*.rs' | xargs touch && cargo watch -x run"
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - target
+        - action: rebuild
+          path: ./backend/Cargo.toml
+        - action: rebuild
+          path: ./backend/Cargo.lock
     restart: unless-stopped
     depends_on:
       postgres:
