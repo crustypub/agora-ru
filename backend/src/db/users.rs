@@ -1,4 +1,4 @@
-use sqlx::{PgPool, Error, query_scalar};
+use sqlx::PgPool;
 use uuid::Uuid;
 use crate::models::auth::TelegramAuthParams;
 use crate::models::user::{ShortUser, User};
@@ -138,14 +138,20 @@ pub async fn update_user_avatar_url(
     Ok(())
 }
 
-pub async fn is_user_exist(
+
+
+pub async fn get_user_by_id(
     pool: &PgPool,
     id: Uuid,
-) -> Result<bool, Error> {
-    let exist: bool =
-        query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
-            .bind(id)
-            .fetch_one(pool)
-            .await?;
-    Ok(exist)
+) -> Result<Option<ShortUser>, sqlx::Error> {
+    sqlx::query_as::<_, ShortUser>(
+        r#"
+        SELECT id, username, first_name, last_name, avatar_url, description
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
 }

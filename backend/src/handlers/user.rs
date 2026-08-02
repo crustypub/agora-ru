@@ -5,7 +5,7 @@ use uuid:: Uuid;
 
 use crate:: {
     db::users:: {
-        is_user_exist
+        get_user_by_id
     }
 };
 
@@ -248,21 +248,27 @@ pub async fn delete_avatar(user: AuthenticatedUser, state: web::Data<AppState>) 
     }
 }
 
-#[get("/users/exists/{id}")]
-pub async fn check_user_exist(
+
+
+#[get("/users/id/{id}")]
+pub async fn get_user_by_id_handler(
     state: web::Data<AppState>,
     path: web::Path<Uuid>
 ) -> impl Responder {
     let user_id = path.into_inner();
 
-    match is_user_exist(&state.pool, user_id).await {
-        Ok(exists) => HttpResponse::Ok().json(serde_json::json!({
-            "exists": exists
+    match get_user_by_id(&state.pool, user_id).await {
+        Ok(Some(user)) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": user
+        })),
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+            "error": "User not found"
         })),
         Err(e) => {
-            eprintln!("Failed to check user existence in DB: {}", e);
+            eprintln!("Failed to fetch user by id: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to check user existence in DB"
+                "error": "Failed to fetch user"
             }))
         }
     }

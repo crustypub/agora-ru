@@ -15,7 +15,7 @@ use handlers::{
 };
 use models::app::AppState;
 
-use crate::{handlers::{chats::get_rooms, user::{check_user_exist, delete_avatar, get_users, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}}, models::chat::ChatServerState};
+use crate::{handlers::{chats::get_rooms, user::{get_user_by_id_handler, delete_avatar, get_users, update_user_info, upload_avatar}, wiki::{add_star_to_wiki, get_wiki_articles, remove_star_from_wiki, upload_wiki_article_images}}, models::chat::ChatServerState};
 use crate::handlers::comment::{create_comment, delete_comment, edit_comment, get_comments};
 use crate::handlers::chats_ws::chat_ws_route;
 use crate::handlers::chats::{create_room, add_member, remove_member, delete_message, get_room_messages, upload_file, parse_link};
@@ -118,7 +118,7 @@ async fn main() -> std::io::Result<()> {
                 .service(remove_member)
                 .service(delete_message)
                 .service(upload_file)
-                .service(check_user_exist)
+                .service(get_user_by_id_handler)
         )
     })
     .bind(("0.0.0.0", 6080))?
