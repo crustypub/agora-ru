@@ -14,6 +14,12 @@ export const useNavigation = () => {
             active: route.path === '/',
         },
         {
+            label: 'Пользователи',
+            to: '/users',
+            icon: 'material-symbols:group-outline',
+            active: route.path.startsWith('/users'),
+        },
+        {
             label: 'Wiki',
             to: '/wiki',
             icon: 'material-symbols:book-ribbon-outline',
