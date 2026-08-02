@@ -1,13 +1,18 @@
 use actix_multipart::Multipart;
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use validator::Validate;
+use uuid:: Uuid;
+
+use crate:: {
+    db::users:: {
+        is_user_exist
+    }
+};
 
 use crate::{
     db::users::{
         get_user_avatar_url, get_users_paginated, update_user_avatar_url, update_user_profile,
-    },
-    helpers::{api::{AuthenticatedUser, escape_like_pattern}, images},
-    models::{
+    }, helpers::{api::{AuthenticatedUser, escape_like_pattern}, images}, models::{
         app::AppState,
         user::{GetUsersParams, UpdateUserInfoRequest},
     },
@@ -238,6 +243,26 @@ pub async fn delete_avatar(user: AuthenticatedUser, state: web::Data<AppState>) 
             eprintln!("Failed to delete avatar_url in DB: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to delete avatar_url in DB"
+            }))
+        }
+    }
+}
+
+#[get("/users/exists/{id}")]
+pub async fn check_user_exist(
+    state: web::Data<AppState>,
+    path: web::Path<Uuid>
+) -> impl Responder {
+    let user_id = path.into_inner();
+
+    match is_user_exist(&state.pool, user_id).await {
+        Ok(exists) => HttpResponse::Ok().json(serde_json::json!({
+            "exists": exists
+        })),
+        Err(e) => {
+            eprintln!("Failed to check user existence in DB: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to check user existence in DB"
             }))
         }
     }
