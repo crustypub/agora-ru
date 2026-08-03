@@ -16,6 +16,8 @@ export interface IListFiltersOptions<TExtra extends Record<string, unknown>>
   syncUrl?: boolean;
   /** Задержка debounce для поиска (мс). По умолчанию 350 */
   searchDebounce?: number;
+  /** Имя query-параметра для поиска. По умолчанию 'search' */
+  searchKey?: string;
 }
 
 /**
@@ -36,6 +38,7 @@ export function useListFilters<TExtra extends Record<string, unknown>>(
     defaultSortOrder = 'desc' as SortOrder,
     syncUrl = false,
     searchDebounce = 350,
+    searchKey = 'search',
     extraFromUrl,
     extraToUrl,
   } = options ?? {};
@@ -82,7 +85,7 @@ export function useListFilters<TExtra extends Record<string, unknown>>(
     };
 
     if (debouncedSearch.value) {
-      result.search = debouncedSearch.value;
+      result[searchKey] = debouncedSearch.value;
     }
 
     for (const [key, value] of Object.entries(extra)) {

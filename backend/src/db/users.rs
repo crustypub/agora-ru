@@ -17,7 +17,7 @@ pub async fn upsert_tg_user(
         )
         SELECT * FROM inserted
         UNION ALL
-        SELECT * FROM users 
+        SELECT * FROM users
         WHERE telegram_id = $1
         LIMIT 1
         "#,
@@ -39,11 +39,11 @@ pub async fn get_users_paginated(
 ) -> Result<(Vec<ShortUser>, i64), sqlx::Error> {
     let users = sqlx::query_as::<_, ShortUser>(
         r#"
-        SELECT id, username, first_name, last_name, avatar_url
+        SELECT id, username, first_name, last_name, avatar_url, description
         FROM users
-        WHERE ($3::text IS NULL OR 
-               username ILIKE $3 ESCAPE '\' OR 
-               first_name ILIKE $3 ESCAPE '\' OR 
+        WHERE ($3::text IS NULL OR
+               username ILIKE $3 ESCAPE '\' OR
+               first_name ILIKE $3 ESCAPE '\' OR
                last_name ILIKE $3 ESCAPE '\')
         ORDER BY username DESC
         LIMIT $1 OFFSET $2
@@ -57,11 +57,11 @@ pub async fn get_users_paginated(
 
     let count = sqlx::query_scalar::<_, i64>(
         r#"
-        SELECT COUNT(*) 
+        SELECT COUNT(*)
         FROM users
-        WHERE ($1::text IS NULL OR 
-               username ILIKE $1 ESCAPE '\' OR 
-               first_name ILIKE $1 ESCAPE '\' OR 
+        WHERE ($1::text IS NULL OR
+               username ILIKE $1 ESCAPE '\' OR
+               first_name ILIKE $1 ESCAPE '\' OR
                last_name ILIKE $1 ESCAPE '\')
         "#,
     )
@@ -120,7 +120,7 @@ pub async fn get_user_avatar_url(
     .bind(user_id)
     .fetch_optional(pool)
     .await?;
-    
+
     Ok(res.flatten())
 }
 
@@ -136,4 +136,22 @@ pub async fn update_user_avatar_url(
         .await?;
 
     Ok(())
+}
+
+
+
+pub async fn get_user_by_id(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<Option<ShortUser>, sqlx::Error> {
+    sqlx::query_as::<_, ShortUser>(
+        r#"
+        SELECT id, username, first_name, last_name, avatar_url, description
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
 }

@@ -1,4 +1,4 @@
-import type { IUserResponse } from "./user.entities";
+import type { IUser } from "./user.entities";
 
 export type ChatRoomType = 'direct' | 'group';
 export type RoomRole = 'owner' | 'moderator' | 'member';
@@ -17,7 +17,7 @@ export interface IChatMessage {
   sender_id: string | null;
   content: string;
   created_at: number; // Unix Epoch в секундах
-  author: IUserResponse | null;
+  author: IUser | null;
   is_read?: boolean;
   attachments?: IChatAttachment[] | null;
 }
@@ -32,7 +32,7 @@ export interface IChatListItem {
   updated_at: number;
   unread_count: number;
   last_message: IChatMessage | null;
-  direct_user: IUserResponse | null;
+  direct_user: IUser | null;
 }
 
 export interface IRoomMemberInfo {

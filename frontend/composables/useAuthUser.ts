@@ -1,5 +1,5 @@
-import type { IUserResponse } from "~/models/entities/user.entities";
+import type { IUser } from "~/models/entities/user.entities";
 
 export const useAuthUser = () => {
-    return useState<IUserResponse | null>('auth_user', () => null);
+    return useState<IUser | null>('auth_user', () => null);
 };

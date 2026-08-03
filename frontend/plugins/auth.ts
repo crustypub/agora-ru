@@ -1,12 +1,12 @@
 import { useAuthUser } from "~/composables/useAuthUser";
 import { useApi } from "~/composables/useApi";
-import type { IUserResponse } from "~/models/entities/user.entities";
+import type { IUser } from "~/models/entities/user.entities";
 
 export default defineNuxtPlugin(async (nuxtApp) => {
     const authUser = useAuthUser();
 
     try {
-        const { data } = await useApi<{ data: IUserResponse }>('/api/auth/me');
+        const { data } = await useApi<{ data: IUser }>('/api/auth/me');
         if (data.value && data.value.data) {
             authUser.value = data.value.data;
         }

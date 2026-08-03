@@ -1,13 +1,18 @@
 use actix_multipart::Multipart;
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use validator::Validate;
+use uuid:: Uuid;
+
+use crate:: {
+    db::users:: {
+        get_user_by_id
+    }
+};
 
 use crate::{
     db::users::{
         get_user_avatar_url, get_users_paginated, update_user_avatar_url, update_user_profile,
-    },
-    helpers::{api::{AuthenticatedUser, escape_like_pattern}, images},
-    models::{
+    }, helpers::{api::{AuthenticatedUser, escape_like_pattern}, images}, models::{
         app::AppState,
         user::{GetUsersParams, UpdateUserInfoRequest},
     },
@@ -238,6 +243,32 @@ pub async fn delete_avatar(user: AuthenticatedUser, state: web::Data<AppState>) 
             eprintln!("Failed to delete avatar_url in DB: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to delete avatar_url in DB"
+            }))
+        }
+    }
+}
+
+
+
+#[get("/users/id/{id}")]
+pub async fn get_user_by_id_handler(
+    state: web::Data<AppState>,
+    path: web::Path<Uuid>
+) -> impl Responder {
+    let user_id = path.into_inner();
+
+    match get_user_by_id(&state.pool, user_id).await {
+        Ok(Some(user)) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": user
+        })),
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+            "error": "User not found"
+        })),
+        Err(e) => {
+            eprintln!("Failed to fetch user by id: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to fetch user"
             }))
         }
     }

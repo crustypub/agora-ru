@@ -1,4 +1,4 @@
-import type { IUserResponse } from "./user.entities";
+import type { IUser } from "./user.entities";
 
 export interface IWikiType {
   id: number;
@@ -11,10 +11,10 @@ export interface IWikiArticle {
   title: string;
   content: string;
   created_at: number;
-  created_by: IUserResponse;
+  created_by: IUser;
   id: string;
   is_confirmed: boolean;
-  last_edited_by: IUserResponse;
+  last_edited_by: IUser;
   updated_at: number;
   wiki_type: IWikiType;
   stars_count: number;
