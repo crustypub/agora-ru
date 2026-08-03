@@ -184,7 +184,6 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .auth-card {
   width: 100%;
-  max-width: 500px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 
   &__title {

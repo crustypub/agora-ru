@@ -236,8 +236,6 @@ const handleDeleteSubmit = async () => {
 <style lang="scss" scoped>
 .wiki-article-container {
   width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
   padding: 1rem 0 4rem;
   display: flex;
   flex-direction: column;

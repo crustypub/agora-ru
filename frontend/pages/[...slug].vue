@@ -1,6 +1,6 @@
 <template>
   <div class="error-page-container">
-    <div class="w-full max-w-2xl px-4 py-8">
+    <div class="w-full px-4 py-8">
       <UCard class="error-main-card shadow-md">
         <div class="flex flex-col h-full justify-between gap-8 py-4">
           <div>

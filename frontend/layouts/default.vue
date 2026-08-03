@@ -144,6 +144,9 @@ const sidebarUserItems = computed(() => {
     flex-direction: column;
     min-width: 0;
     height: 100%;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
 
     &__container {
       flex: 1 1 auto;
@@ -151,12 +154,13 @@ const sidebarUserItems = computed(() => {
       flex-direction: column;
       padding-top: .5rem;
       padding-bottom: .5rem;
+      width: 100%;
     }
 
     @media (min-width: 1024px) {
       overflow: hidden;
       height: calc(100% - 2rem);
-      margin: 1rem 1rem 1rem 0;
+      margin: 1rem auto;
       background-color: var(--ui-bg);
       border: 1px solid var(--ui-border);
       border-radius: var(--ui-radius, 0);
