@@ -43,6 +43,17 @@
       <!-- Main Content Area -->
       <main class="layout-main">
         <UContainer class="layout-main__container">
+          <div v-if="showBackButton" class="layout-main__back-btn">
+            <UButton
+              icon="material-symbols:arrow-back-rounded"
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              @click="handleBack"
+            >
+              Назад
+            </UButton>
+          </div>
           <slot />
         </UContainer>
       </main>
@@ -55,7 +66,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import { useRoute } from '#app';
+import { useRoute, useRouter } from '#app';
 import { useNavigation } from '~/composables/useNavigation';
 import { useAuthUser } from '~/composables/useAuthUser';
 import { useSidebar } from '~/composables/useSidebar';
@@ -64,6 +75,17 @@ const isSidebarOpen = useSidebar();
 const { navItems } = useNavigation();
 const authUser = useAuthUser();
 const route = useRoute();
+const router = useRouter();
+
+const showBackButton = computed(() => route.path.split('/').filter(Boolean).length > 1);
+
+const handleBack = () => {
+  if (import.meta.client && window.history.state?.back) {
+    router.back();
+  } else {
+    navigateTo('/');
+  }
+};
 
 // Close sidebar on mobile/tablet viewports upon routing to a new page
 watch(() => route.fullPath, () => {
@@ -153,6 +175,11 @@ const sidebarUserItems = computed(() => {
       padding-top: .5rem;
       padding-bottom: .5rem;
       width: 100%;
+    }
+
+    &__back-btn {
+      margin-bottom: 0.5rem;
+      align-self: flex-start;
     }
 
     @media (min-width: 1024px) {

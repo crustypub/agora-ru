@@ -1,18 +1,5 @@
 <template>
   <div class="wiki-article-container">
-    <!-- Кнопка назад -->
-    <div class="wiki-article__back">
-      <UButton
-        icon="material-symbols:arrow-back-rounded"
-        variant="ghost"
-        color="neutral"
-        size="sm"
-        @click="goBack"
-      >
-        Назад к списку
-      </UButton>
-    </div>
-
     <!-- Загрузка / Ошибка -->
     <UCard v-if="!response?.data">
       <USkeleton class="h-8 w-3/4 mb-4" />
