@@ -15,7 +15,11 @@ export default defineAppConfig({
                 title: 'shrink-0 flex items-end gap-1.5 text-white',
                 toggle: 'lg:hidden text-white',
             },
-
+        },
+        sidebar: {
+            slots: {
+                container: 'top-14 h-[calc(100vh-3.5rem)] bg-[var(--ui-bg)] border-r border-[var(--ui-border)]',
+            }
         },
         footer: {
             slots: {

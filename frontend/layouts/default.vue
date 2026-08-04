@@ -4,9 +4,7 @@
 
     <div class="layout-body">
       <!-- Sidebar -->
-      <USidebar v-model:open="isSidebarOpen" variant="inset" collapsible="icon" :ui="{
-        container: 'top-14 h-[calc(100vh-3.5rem)]'
-      }">
+      <USidebar v-model:open="isSidebarOpen" collapsible="icon">
         <UNavigationMenu orientation="vertical" :items="navItems" :collapsed="!isSidebarOpen" :tooltip="true" :ui="{
           root: 'w-full group/nav-menu',
           linkLeadingIcon: 'w-5 h-5 min-w-5 shrink-0'
